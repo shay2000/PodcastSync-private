@@ -1,0 +1,26 @@
+# PodcastSync backend — safe-by-default Docker Compose (Phase 6 V3).
+#
+# The container is published ONLY on the host loopback interface
+# (127.0.0.1:8642). For any public access, put a reverse proxy that terminates
+# TLS in front of it (see deploy/caddy/Caddyfile); never publish this port to
+# 0.0.0.0. PODCASTSYNC_PUBLIC_URL is required for this deployment and Compose
+# fails fast if it is missing. YOUTUBE_API_KEY and PODCASTSYNC_POLL_INTERVAL
+# are optional and read from the host environment or a local .env file, so no
+# secrets are embedded here.
+services:
+  podcastsync:
+    build: .
+    container_name: podcastsync
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8642:8642"
+    environment:
+      - PODCASTSYNC_PUBLIC_URL=${PODCASTSYNC_PUBLIC_URL:?set to https://your.domain}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - PODCASTSYNC_POLL_INTERVAL=${PODCASTSYNC_POLL_INTERVAL:-30}
+    volumes:
+      - podcastsync-data:/data
+
+volumes:
+  # Persistent SQLite database + PodcastMirror audio library.
+  podcastsync-data:
