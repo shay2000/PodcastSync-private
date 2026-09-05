@@ -59,44 +59,49 @@ brew install ffmpeg
 ### Run on a server (Docker)
 
 The Docker image runs the same backend as the macOS app, with SQLite and audio
-stored in a persistent `podcastsync-data` volume. The default Compose file
-publishes the backend only on `127.0.0.1:8642`; put a TLS-terminating reverse
-proxy in front of it rather than publishing port 8642 to the internet.
+stored in a persistent `podcastsync-data` volume. The backend is published only
+on `127.0.0.1:8642`. The optional `public` profile adds Caddy in Docker and
+exposes only `/feed/...` and `/audio/...` over HTTPS; the dashboard and `/api`
+remain private.
 
-1. Point a DNS A record such as `podcast.example.com` at the server.
-2. Create a local `.env` file (never commit it) with the public origin and any
-   optional settings:
+For the complete owner + coding-agent runbook, see
+[`docs/ORACLE_VPS_HANDOFF.md`](docs/ORACLE_VPS_HANDOFF.md).
 
-   ```dotenv
-   PODCASTSYNC_PUBLIC_URL=https://podcast.example.com
-   YOUTUBE_API_KEY=
-   PODCASTSYNC_POLL_INTERVAL=30
-   ```
+Quick start on an Ubuntu Oracle VPS:
 
-3. Start and check the service:
+1. Create a DNS A record such as `podcast.example.com` pointing to the VPS
+   public IPv4 address. Allow TCP 80 and 443 in the Oracle VCN and instance
+   firewall; leave 8642 closed.
+2. Copy `.env.example` to `.env` (never commit it), set the real domain in
+   `PODCASTSYNC_DOMAIN` and `PODCASTSYNC_PUBLIC_URL`, and optionally add a
+   `YOUTUBE_API_KEY`.
+3. Start the private backend and public HTTPS feed proxy:
 
    ```bash
-   docker compose up -d --build
+   docker compose --profile public up -d --build
    curl -fsS http://127.0.0.1:8642/api/status
-   docker compose logs -f podcastsync
+   docker compose logs -f podcastsync caddy
    ```
 
-4. Configure `deploy/caddy/Caddyfile` with the real domain and configure TLS
-   before public exposure. Caddy can obtain a certificate automatically once
-   DNS and firewall rules for ports 80 and 443 are ready.
+   Or run `./deploy/oracle/install.sh --domain podcast.example.com`; it creates
+   `.env` only when absent and does not change DNS, firewall rules, or an
+   existing `.env`.
+4. Open the private dashboard through an SSH tunnel:
 
-Do not expose this deployment publicly until the planned Host allow-list and
-API-token hardening is enabled: the current backend has no user accounts or
-authentication. On a headless server, use a Netscape-format cookie file only
-when YouTube requires sign-in; mount it read-only at `/data/cookies.txt` and set
-`cookies_file_path` through the settings API. Never bake a cookie file into the
-image or commit it.
+   ```bash
+   ssh -N -L 8642:127.0.0.1:8642 <ssh-user>@<server-address>
+   ```
 
-With `PODCASTSYNC_PUBLIC_URL` set, copied feeds and generated RSS enclosures
-use the HTTPS public origin, for example
-`https://podcast.example.com/feed/1.xml`. The macOS menu bar app continues to
-manage a local bundled backend in v1; the Docker deployment is managed through
-its web UI.
+   Then visit `http://127.0.0.1:8642` on the owner's Mac. With
+   `PODCASTSYNC_PUBLIC_URL` set, copied feeds and generated RSS enclosures use
+   the HTTPS public origin, for example
+   `https://podcast.example.com/feed/1.xml`.
+
+On a headless server, the Google/YouTube API key enables metadata and full
+history but does not sign yt-dlp into YouTube. If a video requires sign-in, use
+a Netscape-format cookie file mounted read-only at `/data/cookies.txt` and set
+`cookies_file_path` through the private dashboard. Never bake cookies into the
+image or commit them.
 
 ## Usage
 
@@ -117,11 +122,12 @@ its web UI.
    - **Downcast**: Add → Feed URL → paste
 3. The feed URL looks like `http://192.168.x.x:8642/feed/1.xml`
 
-Overcast disclaimer:
+Overcast note:
 Overcast's crawlers cannot reach a feed hosted only on your LAN. Use the Docker
-server deployment above with a public HTTPS URL for Overcast. Apple Podcasts
-and Downcast can use the LAN URL. On iOS 14+, grant the podcast app Local
-Network permission when subscribing to a LAN feed.
+server deployment above with a public HTTPS URL, then add the HTTPS feed URL in
+Overcast. Apple Podcasts and Downcast can use either a LAN URL or the public
+URL. On iOS 14+, grant the podcast app Local Network permission when subscribing
+to a LAN feed.
 
 ### Setting up the YouTube API key
 

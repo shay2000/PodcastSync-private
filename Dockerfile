@@ -4,12 +4,18 @@
 # ffmpeg is required by yt-dlp for MP3 extraction; ca-certificates keeps HTTPS
 # working. Nothing else is apt-installed on purpose, and the container
 # healthcheck uses the Python standard library so no extra tool is required.
+# Current YouTube extraction also needs yt-dlp-ejs plus a JavaScript runtime;
+# the Node 22 binary is copied from the official Node image below.
 # Proxy headers (X-Forwarded-*) are honoured only when they come from
 # 127.0.0.1. In the shipped host-level Caddy topology, Docker NAT changes the
 # peer address, so PODCASTSYNC_PUBLIC_URL is required for public feed links.
 # Do not widen this allowlist without a deliberately trusted private network.
 
+FROM node:22-bookworm-slim AS node-runtime
+
 FROM python:3.12-slim
+
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates \

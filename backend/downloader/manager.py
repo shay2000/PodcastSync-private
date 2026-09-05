@@ -82,6 +82,9 @@ class DownloadManager:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            # yt-dlp's Python API enables Deno by default, but the Docker
+            # image provides Node 22 for YouTube's current JS challenges.
+            "js_runtimes": {"node": {}},
         }
         if self.ffmpeg_path:
             opts["ffmpeg_location"] = os.path.dirname(self.ffmpeg_path)
@@ -92,6 +95,8 @@ class DownloadManager:
             cookie_file = (self._settings.cookies_file_path if self._settings else "").strip()
             if cookie_file and os.path.isfile(cookie_file):
                 opts["cookiefile"] = cookie_file
+            elif cookie_file:
+                logger.warning("Configured YouTube cookie file was not found: %s", cookie_file)
         return opts
 
     def _get_output_dir(self, source_name: str, custom_storage_path: str | None) -> Path:

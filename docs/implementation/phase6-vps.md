@@ -1,5 +1,14 @@
 # Phase 6 — Public VPS / Docker deployment (V1–V7) — unlocks Overcast
 
+> **Current implementation note (2026-09-05):** This is the historical Phase 6
+> plan and contains superseded drafts, including a proposed
+> `PODCASTSYNC_API_TOKEN` and a full-dashboard reverse proxy. For the current
+> implementation and the friend-facing agent runbook, use
+> [`docs/ORACLE_VPS_HANDOFF.md`](../ORACLE_VPS_HANDOFF.md). The current Docker
+> `public` profile keeps the dashboard and `/api` on an SSH tunnel and exposes
+> only `/feed/*` and `/audio/*`; do not implement the old token draft from this
+> document without a separate security design and code change.
+
 Goal (owner request): run the PodcastSync backend on an **Oracle Cloud VPS** (Linux) in Docker behind HTTPS so Overcast (and any internet podcast client) can subscribe. The macOS app remains the local control surface; the backend is pure Python and runs anywhere.
 
 Why this enables Overcast (verified): Overcast subscribes by having its own servers crawl every feed URL on the public internet. A LAN `http://192.168.x.x:8642` feed is unreachable — but `https://podcast.example.com/feed/1.xml` is crawled normally. Downcast/Apple Podcasts also fetch on-device, so they work both on the LAN and here. No XML change is required; reachability + correct advertised URLs are the fix.

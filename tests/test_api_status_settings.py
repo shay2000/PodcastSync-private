@@ -30,6 +30,7 @@ SETTINGS_KEYS = {
     "public_url",
     "cookies_from_browser",
     "cookies_file_path",
+    "cookies_file_available",
 }
 
 
@@ -95,6 +96,7 @@ async def test_get_settings_shape(api):
     assert body["poll_interval_minutes"] == 1440  # from PODCASTSYNC_POLL_INTERVAL
     assert body["cookies_from_browser"] == ""
     assert body["cookies_file_path"] == ""
+    assert body["cookies_file_available"] is False
     assert body["public_url"] == ""
     # base_url is built from a detected LAN IP, so only its shape is stable.
     assert body["base_url"].startswith("http://")
@@ -197,3 +199,12 @@ async def test_cookie_test_reports_an_error_when_nothing_is_configured(api):
         "status": "error",
         "message": "No browser or cookie file configured",
     }
+
+
+async def test_cookie_test_reports_a_missing_cookie_file(api):
+    api.settings.cookies_file_path = "/tmp/does-not-exist-podcastsync-cookies.txt"
+
+    resp = await api.client.post("/api/cookies/test", json={})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "error", "message": "Cookie file not found"}

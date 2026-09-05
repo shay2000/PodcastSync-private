@@ -8,7 +8,9 @@ PodcastSync is a macOS 13+ **menu bar app** that turns YouTube channels/playlist
 
 Key product facts:
 - One RSS feed per source at `/feed/{source_id}.xml`; audio at `/audio/{source_id}/{video_id}.mp3`.
-- No API auth on the server; it binds `0.0.0.0` and is intended for a personal LAN. Never expose it publicly.
+- The backend has no user accounts or API auth. The Docker `public` profile
+  keeps the admin surface private and exposes only feed/audio paths through
+  Caddy; never publish port 8642 directly to the internet.
 - Without a YouTube Data API key it falls back to YouTube public RSS (only ~15 most-recent videos, no durations). API key enables handle resolution, full history, durations.
 - Audio files live under `~/PodcastMirror/<sanitized-source-name>/<video_id>.mp3`; SQLite DB at `~/.podcastsync/podcastsync.db`.
 
@@ -129,7 +131,9 @@ Route conventions: `source_id` = DB row id; `video_id` = YouTube string; `video_
 
 ## Frontend (backend/static)
 
-Vanilla ES modules, no framework/bundler/package.json. `index.html` loads `js/main.js?v=N`; all JS/CSS cache-busting is **manual** (`?v=9` in `index.html`) — bump it when changing assets.
+Vanilla ES modules, no framework/bundler/package.json. `index.html` loads
+`js/main.js?v=11` and `/css/main.css?v=10`; all JS/CSS cache-busting is
+**manual** — bump it when changing assets.
 
 - `js/store.js` — single mutable state singleton + subscribe/notify pub/sub.
 - `js/api.js` — `api(method, path, body)` fetch wrapper; throws `Error(error.detail)` on non-2xx.
@@ -138,7 +142,32 @@ Vanilla ES modules, no framework/bundler/package.json. `index.html` loads `js/ma
 - `js/actions/*` — imperative handlers for data-action dispatch; `js/ui/*` — modals, toasts.
 - `js/main.js` — composition root: one delegated `click` listener switches on `event.target.closest("[data-action]")`; ids via `data-source-id` / `data-video-id`; a delegated `change` listener handles enabled toggles. New interactive elements must follow the `data-action` convention.
 
-CSS: `css/main.css` is a `@import` manifest, BUT `css/overrides.css` re-imports the monolithic legacy `style.css` **last**, so `style.css` (1,808 lines) wins most specificity ties. The modular `tokens.css`/`base.css`/`layout.css`/`components/*` files are mostly shadowed scaffolding mid-refactor. If a visual change "does nothing", the rule you need probably lives in `style.css`. Frontend text is escaped with `esc()` (does NOT escape double quotes) — don't put user text into double-quoted attributes without care.
+CSS: `css/main.css` is a `@import` manifest. `css/overrides.css` retains the
+legacy `style.css` compatibility layer, while newer dashboard-only surfaces
+live in `css/components/dashboard.css` and load last. If an older visual
+change "does nothing", the rule you need probably lives in `style.css`.
+Frontend text and attribute values use `esc()`; preserve that rule whenever
+adding user-controlled strings to HTML templates.
+
+## Oracle VPS / Docker handoff
+
+When asked to deploy PodcastSync for a friend, read
+`docs/ORACLE_VPS_HANDOFF.md` before acting. The intended topology is the
+`docker compose --profile public` stack: the app is on loopback, Caddy exposes
+only `/feed/*` and `/audio/*`, and the owner opens the dashboard with an SSH
+tunnel. Ask the owner for the SSH host/user and key path, domain, and public IP;
+never request private-key, API-key, or cookie contents in chat.
+
+Agent deployment rules:
+
+- Verify DNS and Oracle ingress before changing services.
+- Keep `.env`, the SQLite volume, and cookie files out of git; preserve an
+  existing `.env` and back up the named data volume before updates.
+- Do not expose 8642, expose `/api` through Caddy, or install unreviewed remote
+  scripts. Use `deploy/oracle/install.sh` for the idempotent project setup.
+- A YouTube Data API key is for metadata and history, not YouTube sign-in. A
+  headless Docker deployment needs a read-only Netscape cookie file only when a
+  download actually requires authentication.
 
 ## Swift menu bar app (macos/PodcastSync)
 

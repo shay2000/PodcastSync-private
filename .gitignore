@@ -15,6 +15,7 @@ venv.x86_old/
 *.sqlite3
 .env
 .env.*
+!.env.example
 cookies.txt
 .DS_Store
 *.dmg

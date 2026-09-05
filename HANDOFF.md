@@ -23,6 +23,10 @@ The current DMG is intended to be self-contained for end users. It bundles:
 Recent work completed:
 
 - major frontend redesign
+- dashboard overview with library pulse, summary cards, per-source progress,
+  and always-visible RSS feed details
+- system-native typography and accessibility affordances (keyboard focus and
+  reduced-motion support)
 - shared app/browser branding icon
 - bundled `ffmpeg` and `ffprobe` inside the app
 - rewritten dylib paths so the packaged app does not depend on Homebrew on the target machine
@@ -50,6 +54,7 @@ Recent work completed:
 - `backend/static/js/`: frontend API, store, render, action, modal, and polling modules
 - `backend/static/css/main.css`: frontend stylesheet entrypoint
 - `backend/static/css/`: token, base, layout, and component styles
+- `backend/static/css/components/dashboard.css`: current dashboard surfaces
 - `backend/static/app-icon.svg`: shared app/browser icon source
 - `macos/PodcastSync/Sources/PodcastSyncApp.swift`: menu bar app UI
 - `macos/PodcastSync/Sources/BackendProcess.swift`: backend process startup
@@ -58,6 +63,8 @@ Recent work completed:
 - `scripts/build_app.sh`: app and DMG build
 - `scripts/bundle_macos_tool.sh`: bundles `ffmpeg`/`ffprobe` and rewrites dylib references
 - `scripts/generate_app_icon.swift`: generates the icon raster assets
+- `deploy/oracle/install.sh`: idempotent Oracle VPS + Docker starter
+- `docs/ORACLE_VPS_HANDOFF.md`: owner and coding-agent deployment runbook
 
 ## Run locally
 ```bash
@@ -86,6 +93,21 @@ python -m pytest tests/ -q
 The characterization suite is offline: it uses temporary SQLite/storage paths and
 replaces the YouTube fetcher and download manager after application startup.
 
+## Oracle VPS / Docker deployment
+
+The supported public deployment is:
+
+```bash
+cp .env.example .env
+# Set PODCASTSYNC_DOMAIN and PODCASTSYNC_PUBLIC_URL in .env.
+docker compose --profile public up -d --build
+```
+
+The backend remains on `127.0.0.1:8642`; Caddy publishes only the feed and
+audio paths. Use an SSH tunnel to open the dashboard. Read
+`docs/ORACLE_VPS_HANDOFF.md` before deploying for DNS, Oracle VCN, HTTPS,
+headless YouTube cookies, and maintenance guidance.
+
 ## Build packaged app
 ```bash
 cd "<repo root>"
@@ -109,6 +131,8 @@ Outputs:
 ## Known limitations
 - The app is ad-hoc signed, not notarized.
 - Overcast is known not to work reliably with PodcastSync feeds. Apple Podcasts and Downcast are better-supported clients.
+- A YouTube Data API key is not a YouTube sign-in; downloads that require an
+  account need browser cookies or a Netscape-format cookie file.
 - Without a YouTube API key, RSS fallback only exposes roughly the latest 15 videos from a channel.
 - Podcast clients cache feeds aggressively.
 - The server must be running for clients to fetch feeds and audio.

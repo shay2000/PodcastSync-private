@@ -6,6 +6,8 @@ because it is expensive during application startup.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 KNOWN_BROWSERS = ["chrome", "safari", "firefox", "brave", "chromium", "edge", "opera", "vivaldi"]
 PROBE_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
@@ -56,10 +58,15 @@ def test_cookies(browser: str | None, cookies_file: str | None) -> dict:
         "extract_flat": True,
         "skip_download": True,
         "socket_timeout": 15,
+        # Keep cookie validation aligned with DownloadManager's yt-dlp
+        # runtime so a successful test predicts an actual download.
+        "js_runtimes": {"node": {}},
     }
     if browser:
         opts["cookiesfrombrowser"] = (browser,)
     elif cookies_file:
+        if not Path(cookies_file).is_file():
+            return {"status": "error", "message": "Cookie file not found"}
         opts["cookiefile"] = cookies_file
 
     try:

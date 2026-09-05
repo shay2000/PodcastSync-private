@@ -1,0 +1,362 @@
+/* Dashboard-specific presentation. This file intentionally loads after the
+   legacy compatibility stylesheet so new dashboard surfaces have one clear
+   home while older controls keep their established appearance. */
+
+.dashboard-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
+    gap: 1.2rem;
+    align-items: stretch;
+    margin-top: 1.1rem;
+    padding: 1.5rem;
+    border: 1px solid rgba(23, 48, 95, 0.12);
+    border-radius: 30px;
+    background:
+        radial-gradient(circle at 82% 18%, rgba(113, 194, 201, 0.2), transparent 34%),
+        linear-gradient(122deg, rgba(255, 249, 240, 0.9) 0%, rgba(246, 239, 235, 0.96) 52%, rgba(234, 244, 242, 0.94) 100%);
+    box-shadow: var(--shadow-md);
+}
+
+.dashboard-hero-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.65rem;
+}
+
+.dashboard-eyebrow,
+.pulse-kicker,
+.detail-feed-label {
+    margin: 0;
+    color: #a05e3b;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.dashboard-hero h1 {
+    max-width: 15ch;
+    margin: 0.48rem 0 0.6rem;
+    color: var(--heading);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: clamp(2rem, 4vw, 3.35rem);
+    letter-spacing: -0.055em;
+    line-height: 0.96;
+}
+
+.dashboard-hero-text {
+    max-width: 58ch;
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.dashboard-pulse-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.1rem;
+    border-radius: 24px;
+    color: #fff8f2;
+    background: linear-gradient(145deg, #1c3b72 0%, #14274f 100%);
+    box-shadow: 0 18px 34px rgba(20, 39, 79, 0.2);
+}
+
+.pulse-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 58px;
+    height: 58px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.pulse-mark span {
+    width: 4px;
+    border-radius: 999px;
+    background: #f3c39c;
+}
+
+.pulse-mark span:nth-child(1),
+.pulse-mark span:nth-child(5) { height: 13px; }
+.pulse-mark span:nth-child(2),
+.pulse-mark span:nth-child(4) { height: 25px; }
+.pulse-mark span:nth-child(3) { height: 37px; }
+
+.pulse-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 0;
+}
+
+.pulse-kicker {
+    color: rgba(255, 248, 242, 0.68);
+    font-size: 0.68rem;
+}
+
+.pulse-copy strong {
+    overflow: hidden;
+    color: #fff8f2;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 1.18rem;
+    letter-spacing: -0.025em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pulse-copy span:last-child {
+    overflow: hidden;
+    color: rgba(255, 248, 242, 0.72);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+}
+
+.overview-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: 0.9rem;
+}
+
+.overview-card {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(54, 40, 31, 0.09);
+    border-radius: 20px;
+    background: rgba(255, 252, 248, 0.68);
+    box-shadow: 0 10px 24px rgba(50, 35, 22, 0.055);
+}
+
+.overview-card-primary {
+    border-color: rgba(23, 48, 95, 0.16);
+    background: rgba(238, 243, 252, 0.74);
+}
+
+.overview-card-icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    color: #2b5597;
+    background: rgba(52, 96, 164, 0.12);
+}
+
+.overview-card-icon.is-green {
+    color: #1f8d63;
+    background: rgba(31, 141, 99, 0.12);
+}
+
+.overview-card-icon.is-amber {
+    color: #a77617;
+    background: rgba(213, 161, 38, 0.14);
+}
+
+.overview-card-icon.is-blue {
+    color: #287b9b;
+    background: rgba(40, 123, 155, 0.12);
+}
+
+.overview-card-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+.overview-card-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.overview-card-copy strong {
+    overflow: hidden;
+    color: var(--heading);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 1.28rem;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.overview-card-copy span {
+    overflow: hidden;
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tile-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.tile-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    color: var(--text-soft);
+    font-size: 0.78rem;
+}
+
+.tile-progress-meta strong {
+    color: var(--heading);
+    font-size: 0.78rem;
+}
+
+.tile-progress-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(23, 48, 95, 0.1);
+}
+
+.tile-progress-fill {
+    height: 100%;
+    min-width: 7px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--tile-accent), #4d9fb0);
+}
+
+.detail-panel {
+    min-height: 0;
+}
+
+.detail-feed-url-row {
+    display: flex;
+    align-items: flex-start;
+}
+
+.detail-feed-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 0;
+}
+
+.detail-feed-label {
+    color: var(--text-soft);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+}
+
+/* Keep the established visual language while using platform-native type and
+   interaction feedback for the rest of the dashboard. */
+body,
+button,
+input {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+.brand-name,
+.library-title,
+.detail-name,
+.empty-title,
+.modal-header h3,
+.tile-name,
+.tile-actions .btn-ghost-sm,
+.mini-toggle {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+}
+
+.brand-name,
+.library-title,
+.detail-name,
+.empty-title,
+.modal-header h3,
+.tile-name {
+    letter-spacing: -0.035em;
+}
+
+button:focus-visible,
+input:focus-visible,
+[tabindex="0"]:focus-visible {
+    outline: 3px solid rgba(23, 48, 95, 0.28);
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@media (max-width: 980px) {
+    .dashboard-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .dashboard-hero {
+        padding: 1.1rem;
+    }
+
+    .dashboard-hero h1 {
+        font-size: 2.3rem;
+    }
+
+    .overview-strip {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .dashboard-hero {
+        border-color: rgba(155, 182, 255, 0.16);
+        background:
+            radial-gradient(circle at 82% 18%, rgba(65, 135, 155, 0.16), transparent 34%),
+            linear-gradient(122deg, rgba(32, 38, 56, 0.96) 0%, rgba(29, 34, 49, 0.98) 55%, rgba(24, 42, 51, 0.97) 100%);
+    }
+
+    .dashboard-eyebrow {
+        color: #e2a77e;
+    }
+
+    .overview-card,
+    .overview-card-primary {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(31, 34, 46, 0.78);
+    }
+
+    .overview-card-primary {
+        background: rgba(36, 48, 75, 0.8);
+    }
+
+    .tile-progress-track {
+        background: rgba(155, 182, 255, 0.13);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    [tabindex="0"]:focus-visible {
+        outline-color: rgba(155, 182, 255, 0.42);
+    }
+}

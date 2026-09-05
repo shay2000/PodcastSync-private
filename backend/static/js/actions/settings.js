@@ -109,7 +109,7 @@ export async function testCookies(browser) {
         const data = await api("POST", "/api/cookies/test", browser ? { browser } : {});
         if (data.status === "ok") {
             result.className = "test-cookies-result is-ok";
-            result.textContent = "✓ Working";
+            result.textContent = "✓ Working — re-download failed episodes";
             if (globalChip) {
                 globalChip.hidden = false;
                 globalChip.className = "auth-global-chip is-ok";
@@ -137,7 +137,7 @@ export async function saveApiKey() {
     try {
         await api("PATCH", "/api/settings", { youtube_api_key: key });
         document.getElementById("api-key").value = "";
-        toast("API key saved");
+        toast("API key saved for YouTube metadata");
         await getSettings(true);
     } catch (error) {
         toast(error.message, "error");
@@ -159,7 +159,7 @@ export async function saveCookiesFile() {
     const filePath = document.getElementById("cookies-file-path").value.trim();
     try {
         await api("PATCH", "/api/settings", { cookies_file_path: filePath });
-        toast(filePath ? "Cookie file path saved" : "Cookie file path cleared");
+        toast(filePath ? "Cookie file path saved — test it now" : "Cookie file path cleared");
         invalidateSettingsCache();
     } catch (error) {
         toast(error.message, "error");

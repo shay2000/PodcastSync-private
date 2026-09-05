@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PodcastSync</title>
     <link rel="icon" type="image/svg+xml" href="/app-icon.svg?v=1">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/main.css?v=9">
+    <link rel="stylesheet" href="/css/main.css?v=10">
 </head>
 <body>
     <header class="app-header">
@@ -28,7 +25,7 @@
         <div class="header-center">
             <div class="status-pill">
                 <span class="status-dot" id="server-status"></span>
-                <span id="status-text">Connecting...</span>
+                <span id="status-text" role="status" aria-live="polite">Connecting...</span>
             </div>
             <span id="next-poll" class="poll-info"></span>
             <button id="cancel-downloads-btn" class="btn-stop" data-action="cancel-downloads" hidden>
@@ -57,10 +54,78 @@
     </header>
 
     <main class="app-main">
+        <section class="dashboard-hero" aria-labelledby="dashboard-title">
+            <div class="dashboard-hero-copy">
+                <p class="dashboard-eyebrow">Personal audio library</p>
+                <h1 id="dashboard-title">Keep your shows moving.</h1>
+                <p class="dashboard-hero-text">PodcastSync checks your YouTube sources, turns new uploads into MP3 episodes, and keeps your podcast feeds ready.</p>
+            </div>
+            <div class="dashboard-pulse-card">
+                <div class="pulse-mark" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <div class="pulse-copy">
+                    <span class="pulse-kicker">Library pulse</span>
+                    <strong id="overview-pulse">Getting things ready</strong>
+                    <span id="overview-pulse-detail">Add a source to start building your library.</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="overview-strip" aria-label="Library overview">
+            <article class="overview-card overview-card-primary">
+                <span class="overview-card-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="8"></circle>
+                        <path d="M8.5 12h7M12 8.5v7"></path>
+                    </svg>
+                </span>
+                <span class="overview-card-copy">
+                    <strong id="overview-shows">0</strong>
+                    <span>Shows connected</span>
+                </span>
+            </article>
+            <article class="overview-card">
+                <span class="overview-card-icon is-green" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12.5 9.2 17 19 7"></path>
+                    </svg>
+                </span>
+                <span class="overview-card-copy">
+                    <strong id="overview-ready">0</strong>
+                    <span>Episodes ready</span>
+                </span>
+            </article>
+            <article class="overview-card">
+                <span class="overview-card-icon is-amber" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="8"></circle>
+                        <path d="M12 8v4l2.8 2"></path>
+                    </svg>
+                </span>
+                <span class="overview-card-copy">
+                    <strong id="overview-queue">0</strong>
+                    <span>Waiting to download</span>
+                </span>
+            </article>
+            <article class="overview-card">
+                <span class="overview-card-icon is-blue" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+                        <path d="M8 3v4M16 3v4M4 10h16"></path>
+                    </svg>
+                </span>
+                <span class="overview-card-copy">
+                    <strong id="overview-next">—</strong>
+                    <span>Next sync</span>
+                </span>
+            </article>
+        </section>
+
         <div class="library-bar">
             <div>
                 <h2 class="library-title">Your Library</h2>
-                <p id="library-subtitle" class="library-subtitle">No sources attached yet.</p>
+                <p id="library-subtitle" class="library-subtitle" aria-live="polite">No sources attached yet.</p>
             </div>
             <button id="sync-all-btn" class="btn-sync-all" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -139,6 +204,18 @@
                         </div>
                     </div>
 
+                    <div class="detail-feed-url-row" id="detail-feed-url-row" hidden>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M4 11a9 9 0 0 1 9 9"/>
+                            <path d="M4 4a16 16 0 0 1 16 16"/>
+                            <circle cx="5" cy="19" r="1" fill="currentColor"/>
+                        </svg>
+                        <div class="detail-feed-copy">
+                            <span class="detail-feed-label">Podcast feed</span>
+                            <span id="detail-feed-url" class="detail-feed-url-text"></span>
+                        </div>
+                    </div>
+
                     <div id="detail-episodes-view" class="detail-tab-view">
                         <div class="episodes-section">
                             <div class="episodes-heading-row">
@@ -150,15 +227,6 @@
                     </div>
 
                     <div id="detail-settings-view" class="detail-tab-view" hidden>
-                        <div class="detail-feed-url-row" id="detail-feed-url-row" hidden>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                                <path d="M4 11a9 9 0 0 1 9 9"/>
-                                <path d="M4 4a16 16 0 0 1 16 16"/>
-                                <circle cx="5" cy="19" r="1" fill="currentColor"/>
-                            </svg>
-                            <span id="detail-feed-url" class="detail-feed-url-text"></span>
-                        </div>
-
                         <div class="detail-config">
                             <div class="config-row">
                                 <label class="config-label" for="detail-path">Download folder</label>
@@ -271,6 +339,7 @@
                     <input type="password" id="api-key" placeholder="AIza...">
                     <button id="save-api-key" data-action="save-api-key" class="btn-primary btn-sm" type="button">Save</button>
                 </div>
+                <p class="form-hint">This key unlocks YouTube metadata and history. It does not sign you into YouTube for downloads.</p>
             </div>
 
             <div class="form-field">
@@ -287,7 +356,7 @@
                     <span class="auth-section-title">YouTube Authentication</span>
                     <span class="auth-global-chip" id="auth-global-status" hidden></span>
                 </div>
-                <p class="form-hint">PodcastSync reads your browser's YouTube cookies automatically — just be logged into youtube.com in one of these browsers. No export steps needed.</p>
+                <p class="form-hint">The API key above and YouTube sign-in are different. Cookies are only needed when YouTube asks a download to sign in. Browser detection works on a Mac; Docker/Linux servers should use the Advanced cookie file option.</p>
 
                 <div id="browser-detect-list" class="browser-list">
                     <div class="browser-list-placeholder">Detecting browsers…</div>
@@ -316,6 +385,6 @@
         </div>
     </div>
 
-    <script type="module" src="/js/main.js?v=10"></script>
+    <script type="module" src="/js/main.js?v=11"></script>
 </body>
 </html>
