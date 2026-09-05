@@ -158,6 +158,11 @@ only `/feed/*` and `/audio/*`, and the owner opens the dashboard with an SSH
 tunnel. Ask the owner for the SSH host/user and key path, domain, and public IP;
 never request private-key, API-key, or cookie contents in chat.
 
+For a private Tailscale-only deployment (no public domain; dashboard reached at
+`http://<vps-tailscale-ip>:8642` from a Mac on the same Tailnet), paste
+`docs/HERMES_VPS_ONBOARD_PROMPT.md` into the agent as its first message. It
+handles the whole install gate-by-gate and asks the owner for facts as needed.
+
 Agent deployment rules:
 
 - Verify DNS and Oracle ingress before changing services.
