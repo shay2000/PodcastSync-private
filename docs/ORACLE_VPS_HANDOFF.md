@@ -181,9 +181,17 @@ scp cookies.txt <ssh-user>@<server-address>:/path/to/PodcastSync-private/cookies
 chmod 600 cookies.txt
 ```
 
-The agent should mount it read-only at `/data/cookies.txt`, set
-`cookies_file_path` in the private dashboard's Settings, test it, and delete
-any temporary transfer copy. Never commit it or paste its contents into chat.
+Run the installer again, or use the explicit optional Compose override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d --build
+```
+
+The override mounts the file read-only at `/data/cookies.txt`; the installer
+also sets `cookies_file_path` automatically through the private dashboard API.
+Never commit the file or paste its contents into chat. Refreshing cookies is a
+manual security step because YouTube sessions expire and should not be copied
+into automation logs.
 
 ## Routine maintenance
 

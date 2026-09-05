@@ -44,6 +44,13 @@ command -v docker >/dev/null 2>&1 || die "Docker is not installed or is not on P
 docker compose version >/dev/null 2>&1 || die "the Docker Compose plugin is not available"
 docker info >/dev/null 2>&1 || die "Docker is not running or this user cannot access it"
 
+compose_files=(-f docker-compose.yml)
+if [[ -f cookies.txt ]]; then
+    chmod 600 cookies.txt
+    compose_files+=(-f docker-compose.cookies.yml)
+    printf 'cookies.txt found; it will be mounted read-only for yt-dlp.\n'
+fi
+
 if [[ ! -f .env ]]; then
     umask 077
     {
@@ -62,11 +69,17 @@ configured_url="$(sed -n 's/^PODCASTSYNC_PUBLIC_URL=//p' .env | head -n 1)"
 [[ "$configured_domain" == "$domain" ]] || die "existing .env uses domain '$configured_domain', not '$domain'"
 [[ "$configured_url" == "https://${domain}" ]] || die "PODCASTSYNC_PUBLIC_URL must be https://${domain}"
 
-docker compose --profile public config --quiet
-docker compose --profile public up -d --build
+docker compose "${compose_files[@]}" --profile public config --quiet
+docker compose "${compose_files[@]}" --profile public up -d --build
 
-docker compose exec -T podcastsync python -c \
+docker compose "${compose_files[@]}" exec -T podcastsync python -c \
     'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8642/api/status", timeout=5)'
+
+if [[ -f cookies.txt ]]; then
+    docker compose "${compose_files[@]}" exec -T podcastsync python -c \
+        'import json, urllib.request; data=json.dumps({"cookies_file_path":"/data/cookies.txt"}).encode(); request=urllib.request.Request("http://127.0.0.1:8642/api/settings", data=data, headers={"Content-Type":"application/json"}, method="PATCH"); urllib.request.urlopen(request, timeout=5)'
+    printf '%s\n' 'Configured /data/cookies.txt for yt-dlp through the private settings API.'
+fi
 
 printf '\nPodcastSync is running.\n'
 printf '%s\n' "Public feed origin: https://${domain}"

@@ -103,8 +103,8 @@ cp .env.example .env
 docker compose --profile public up -d --build
 ```
 
-The backend remains on `127.0.0.1:8642`; Caddy publishes only the feed and
-audio paths. Use an SSH tunnel to open the dashboard. Read
+The backend remains on `127.0.0.1:8642` by default; Caddy publishes only the
+feed and audio paths. Use an SSH tunnel to open the dashboard. Read
 `docs/ORACLE_VPS_HANDOFF.md` before deploying for DNS, Oracle VCN, HTTPS,
 headless YouTube cookies, and maintenance guidance.
 

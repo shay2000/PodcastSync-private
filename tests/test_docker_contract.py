@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 DOCKERFILE = ROOT / "Dockerfile"
 COMPOSE = ROOT / "docker-compose.yml"
+COOKIES_COMPOSE = ROOT / "docker-compose.cookies.yml"
 CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile"
 DOCKER_CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile.docker"
 ENV_EXAMPLE = ROOT / ".env.example"
@@ -261,6 +262,14 @@ def test_compose_uses_named_volume_for_data():
     assert re.search(r"^  podcastsync-data:\s*$", text, re.MULTILINE), (
         "podcastsync-data must be declared as a named volume"
     )
+
+
+def test_cookie_compose_override_mounts_gitignored_file_read_only():
+    text = _text(COOKIES_COMPOSE)
+    assert re.search(
+        r"^\s*-\s*\./cookies\.txt:/data/cookies\.txt:ro\s*$", text, re.MULTILINE
+    )
+    assert "cookies.txt" in _text(ROOT / ".gitignore")
 
 
 def test_compose_environment_is_interpolated_and_contains_no_secrets():

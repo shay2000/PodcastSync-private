@@ -101,9 +101,17 @@ Quick start on an Ubuntu Oracle VPS:
 
 On a headless server, the Google/YouTube API key enables metadata and full
 history but does not sign yt-dlp into YouTube. If a video requires sign-in, use
-a Netscape-format cookie file mounted read-only at `/data/cookies.txt` and set
-`cookies_file_path` through the private dashboard. Never bake cookies into the
-image or commit them.
+a Netscape-format cookie file. Place it at `cookies.txt` beside the Compose
+file, keep it mode 600, and start with the optional cookie override:
+
+```bash
+chmod 600 cookies.txt
+docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d --build
+```
+
+The Oracle install script detects this file, mounts it read-only at
+`/data/cookies.txt`, and configures that path automatically. Never bake cookies
+into the image or commit them.
 
 ## Usage
 
