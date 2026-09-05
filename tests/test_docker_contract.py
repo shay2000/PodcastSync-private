@@ -14,9 +14,10 @@ phase6-vps.md):
   ``backend.main:app`` under uvicorn on ``0.0.0.0:8642`` with proxy-header
   trust only from ``127.0.0.1``.
 * ``docker-compose.yml`` — safe by default: named persistent ``/data`` volume,
-  ``restart: unless-stopped``, the host port is bound only to ``127.0.0.1``,
-  and PUBLIC_URL / API key / poll interval come from host environment
-  variables (``${...}``) so no secret is embedded in the file.
+  ``restart: unless-stopped``, the host port defaults to ``127.0.0.1`` and can
+  only be overridden with an explicit bind address, and PUBLIC_URL / API key /
+  poll interval come from host environment variables (``${...}``) so no
+  secret is embedded in the file.
 * ``deploy/caddy/Caddyfile`` — reverse-proxies a placeholder domain to
   ``127.0.0.1:8642`` and documents that TLS must be configured before the site
   is exposed publicly; the Docker Caddyfile has the equivalent service-name
@@ -230,10 +231,14 @@ def test_compose_restarts_unless_stopped():
     assert re.search(r"^\s*restart:\s*unless-stopped\s*$", _text(COMPOSE), re.MULTILINE)
 
 
-def test_compose_binds_host_port_only_to_loopback():
+def test_compose_binds_host_port_to_explicit_safe_interface():
     text = _text(COMPOSE)
-    assert re.search(r'^\s*-\s*"127\.0\.0\.1:8642:8642"\s*$', text, re.MULTILINE), (
-        "port must be published as 127.0.0.1:8642:8642"
+    assert re.search(
+        r'^\s*-\s*"\$\{PODCASTSYNC_BIND_IP:-127\.0\.0\.1\}:8642:8642"\s*$',
+        text,
+        re.MULTILINE,
+    ), (
+        "port must default to loopback and require an explicit bind address override"
     )
     for banned in (
         r'^\s*-\s*"8642:8642"\s*$',
@@ -344,7 +349,7 @@ def test_port_8642_is_consistent_across_artifacts():
     assert re.search(r"^EXPOSE\s+8642\b", docker, re.MULTILINE)
     tokens = _cmd_tokens()
     assert "--port" in tokens and tokens[tokens.index("--port") + 1] == "8642"
-    assert "127.0.0.1:8642:8642" in _text(COMPOSE)
+    assert "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642" in _text(COMPOSE)
     assert "127.0.0.1:8642" in _text(CADDYFILE)
 
 
@@ -359,7 +364,7 @@ def test_volume_target_matches_container_data_envs():
 def test_loopback_only_publish_complements_loopback_proxy_trust():
     dockerfile = _text(DOCKERFILE)
     compose = _text(COMPOSE)
-    assert "127.0.0.1:8642:8642" in compose
+    assert "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642" in compose
     assert "--forwarded-allow-ips" in dockerfile
     assert "127.0.0.1" in dockerfile
     assert "0.0.0.0:8642:8642" not in compose

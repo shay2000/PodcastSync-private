@@ -1,10 +1,12 @@
 # PodcastSync — safe-by-default Docker Compose.
 #
-# The backend is published ONLY on the host loopback interface
-# (127.0.0.1:8642), which makes it reachable through an SSH tunnel for the
-# administrator. The optional `public` profile adds a Caddy container that
-# publishes only HTTPS podcast feeds and audio; the dashboard and /api remain
-# private. Never publish 8642 to 0.0.0.0.
+# The backend is published on the host address selected by
+# PODCASTSYNC_BIND_IP (loopback by default), which makes it reachable through
+# an SSH tunnel for the administrator. A private Tailscale address can be
+# selected when another local service already owns 127.0.0.1:8642. The
+# optional `public` profile adds a Caddy container that publishes only HTTPS
+# podcast feeds and audio; the dashboard and /api remain private. Never
+# publish 8642 to 0.0.0.0.
 #
 # PODCASTSYNC_PUBLIC_URL is required. YOUTUBE_API_KEY and
 # PODCASTSYNC_POLL_INTERVAL are optional and are read from the host environment
@@ -15,7 +17,7 @@ services:
     container_name: podcastsync
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8642:8642"
+      - "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642"
     environment:
       - PODCASTSYNC_PUBLIC_URL=${PODCASTSYNC_PUBLIC_URL:?set to https://your.domain}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}

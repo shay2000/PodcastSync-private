@@ -59,10 +59,12 @@ brew install ffmpeg
 ### Run on a server (Docker)
 
 The Docker image runs the same backend as the macOS app, with SQLite and audio
-stored in a persistent `podcastsync-data` volume. The backend is published only
-on `127.0.0.1:8642`. The optional `public` profile adds Caddy in Docker and
-exposes only `/feed/...` and `/audio/...` over HTTPS; the dashboard and `/api`
-remain private.
+stored in a persistent `podcastsync-data` volume. The backend is published on
+`127.0.0.1:8642` by default. If another local service owns that port, set
+`PODCASTSYNC_BIND_IP` to the server's private Tailscale address; never use
+`0.0.0.0`. The optional `public` profile adds Caddy in Docker and exposes only
+`/feed/...` and `/audio/...` over HTTPS; the dashboard and `/api` remain
+private.
 
 For the complete owner + coding-agent runbook, see
 [`docs/ORACLE_VPS_HANDOFF.md`](docs/ORACLE_VPS_HANDOFF.md).
