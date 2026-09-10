@@ -201,7 +201,7 @@ If YouTube requires sign-in, export a Netscape-format `cookies.txt` on the
 owner's own machine, then transfer it over SSH and protect it:
 
 ```bash
-scp cookies.txt <ssh-user>@<server-address>:/path/to/PodcastSync-private/cookies.txt
+scp cookies.txt <ssh-user>@<server-address>:/path/to/PodcastSync-VPS/cookies.txt
 chmod 600 cookies.txt
 ```
 

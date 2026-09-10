@@ -8,12 +8,12 @@
 # enabled later — see the README.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/<ref>/deploy/linux/install.sh | bash -s -- [--bind-ip <ip>] [--tag vX.Y.Z]
+#   curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-VPS/<ref>/deploy/linux/install.sh | bash -s -- [--bind-ip <ip>] [--tag vX.Y.Z]
 #
 # Or run it from a clone of the repository.
 set -Eeuo pipefail
 
-REPO="shay2000/PodcastSync-private"
+REPO="shay2000/PodcastSync-VPS"
 DEFAULT_REF="main"
 
 say()  { printf '%s\n' "$*"; }

@@ -83,7 +83,7 @@ replaces the YouTube fetcher and download manager after application startup.
 Private (Tailscale-only) — the default:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh \
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-VPS/main/deploy/linux/install.sh \
   | bash -s -- --bind-ip <tailscale-ipv4>
 ```
 

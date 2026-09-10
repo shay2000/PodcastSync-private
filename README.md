@@ -13,41 +13,16 @@ that it works on its own. It is private: only you can reach it.
 ## Don't want to do it yourself? Give this to your AI assistant
 
 If you use an AI assistant that can run commands for you (Claude Code, Codex,
-Cursor, Kilo, and the like), copy everything in the box below, paste it into a
-chat with it, and it will set the whole thing up for you, checking with you
-whenever it needs a decision. It works whether you and the assistant are
-sitting on the server, or on your own computer while the server is elsewhere.
+Cursor, Kilo, and the like), copy the one line below, paste it into a chat
+with it, and it will set the whole thing up for you, checking with you
+whenever it needs a decision.
 
 ```text
-Please set up PodcastSync for me on my server, following the repository's own
-instructions exactly.
-
-1. Find the PodcastSync repository on this machine (look for a folder
-   containing an AGENTS.md file and a deploy/ folder), or clone it from
-   https://github.com/shay2000/PodcastSync-private if it is not here yet.
-2. Read AGENTS.md and README.md in that folder. They are the source of truth.
-3. If the server is a different machine from this one, work over SSH; ask me
-   for the SSH login when you need it.
-4. Install and start PodcastSync with the repository's installer:
-   deploy/linux/install.sh (run it as shown in README.md section "Setting it
-   up", with --bind-ip set to the server's Tailscale address if we use
-   Tailscale). Do not expose the dashboard to the public internet.
-5. Verify the install the way the repository's own instructions say to
-   (health check, then the dashboard over the private address).
-6. If I want to listen with an app that needs public feeds (e.g. Overcast)
-   and I don't own a domain, set up a free DuckDNS name for me as described
-   in docs/ORACLE_VPS_HANDOFF.md (step "create the DNS record", DuckDNS
-   option). If you can control a browser (e.g. a BrowserOS or browser MCP
-   tool), offer to walk me through duckdns.org yourself — navigate and type
-   for me, but let me do the sign-in and any password/account steps myself.
-   Point the name at the server's public IPv4 address.
-7. Report back: the dashboard address to open, and what I should subscribe to
-   in my podcast app.
-
-Rules: never expose port 8642 to the public internet, never print or commit
-secrets, and if anything fails, stop and tell me before trying a fix you
-invented yourself.
+Set up PodcastSync on my server: download the repo from https://github.com/shay2000/PodcastSync-VPS, read SETUP.md in it, and follow it exactly.
 ```
+
+That's all you need to give it — the repo's `SETUP.md` contains the full
+step-by-step instructions for the agent, including the safety rules.
 
 ## What it does
 
@@ -80,7 +55,7 @@ No programming knowledge is needed beyond copying and pasting two commands.
 Log in to your server, then run this one command (copy it exactly):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-VPS/main/deploy/linux/install.sh | bash
 ```
 
 This downloads PodcastSync and starts it. When it finishes, you will see a
@@ -91,7 +66,7 @@ message saying it is running and healthy.
 > it). Then you can open PodcastSync from any of your devices on your Tailnet.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh | bash -s -- --bind-ip 100.x.y.z
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-VPS/main/deploy/linux/install.sh | bash -s -- --bind-ip 100.x.y.z
 ```
 
 ### Step 2 — Open the dashboard
@@ -177,8 +152,8 @@ deployment runbooks — lives in [HANDOFF.md](HANDOFF.md) and
 [AGENTS.md](AGENTS.md). The short version:
 
 ```bash
-git clone https://github.com/shay2000/PodcastSync-private.git
-cd PodcastSync-private
+git clone https://github.com/shay2000/PodcastSync-VPS.git
+cd PodcastSync-VPS
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 pip install -e ".[dev]"
