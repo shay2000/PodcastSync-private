@@ -21,8 +21,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # github.repository is <owner>/<repo>; the image name is lower-cased below.
-  IMAGE_NAME: ${{ github.repository }}
+  # Must match the image referenced by docker-compose.yml and deploy/linux/install.sh.
+  IMAGE_NAME: shay2000/podcastsync
 
 jobs:
   build-and-publish:
@@ -77,9 +77,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # On a tag push, derive semver tags (X.Y.Z, X.Y) plus latest. On a
+          # manual dispatch, github.ref is a branch, so semver matching yields
+          # nothing — fall back to the explicit release_tag input.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Build and push image (amd64 + arm64)

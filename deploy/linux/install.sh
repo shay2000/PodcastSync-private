@@ -21,6 +21,20 @@ die()  { printf 'Error: %s\n' "$1" >&2; exit 1; }
 
 bind_ip="127.0.0.1"
 ref="$DEFAULT_REF"
+image=""
+
+# The dashboard and API have no authentication: the bind address must stay a
+# loopback, private-network, or Tailscale (CGNAT 100.64.0.0/10) address.
+# Anything else (0.0.0.0, a public IP) would expose the admin surface.
+is_private_ip() {
+    local ip="$1"
+    [[ "$ip" =~ ^127\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && return 0
+    [[ "$ip" =~ ^10\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && return 0
+    [[ "$ip" =~ ^192\.168\.[0-9]+\.[0-9]+$ ]] && return 0
+    [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+$ ]] && return 0
+    [[ "$ip" =~ ^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+$ ]] && return 0
+    return 1
+}
 
 while (($# > 0)); do
     case "$1" in
@@ -32,6 +46,7 @@ while (($# > 0)); do
         --tag)
             (($# >= 2)) || die "--tag needs a value (e.g. v0.3.0)"
             ref="$2"
+            image="ghcr.io/shay2000/podcastsync:${ref#v}"
             shift 2
             ;;
         -h|--help)
@@ -43,6 +58,11 @@ while (($# > 0)); do
             ;;
     esac
 done
+
+if [[ "$bind_ip" == "0.0.0.0" ]] || [[ "$bind_ip" == "::" ]]; then
+    die "refusing to bind 0.0.0.0: the dashboard has no authentication. Use a loopback or private Tailscale address (e.g. --bind-ip 100.x.y.z)"
+fi
+is_private_ip "$bind_ip" || die "refusing to bind public address '$bind_ip': the dashboard has no authentication. Use a loopback (127.0.0.1) or private Tailscale address."
 
 command -v docker >/dev/null 2>&1 \
     || die "Docker is not installed. Install it first: https://docs.docker.com/engine/install/"
@@ -82,12 +102,28 @@ if [[ ! -f .env ]]; then
         printf 'PODCASTSYNC_PUBLIC_URL=%s\n' "${PODCASTSYNC_PUBLIC_URL:-http://${bind_ip}:8642}"
         printf 'YOUTUBE_API_KEY=%s\n' "${YOUTUBE_API_KEY:-}"
         printf 'PODCASTSYNC_POLL_INTERVAL=%s\n' "${PODCASTSYNC_POLL_INTERVAL:-30}"
+        [[ -n "$image" ]] && printf 'PODCASTSYNC_IMAGE=%s\n' "$image"
     } > .env
     say "-> Created .env (mode 600)."
     say "   The dashboard will be reachable at http://${bind_ip}:8642"
     say "   Edit ${install_dir}/.env to add a YOUTUBE_API_KEY (optional) or change the poll interval."
 else
     say "-> .env already exists; leaving it unchanged."
+fi
+
+# A --tag install is a pinned install: make sure the running image matches the
+# fetched deployment files, updating the pin when the operator changes --tag.
+if [[ -n "$image" ]]; then
+    if grep -q '^PODCASTSYNC_IMAGE=' .env 2>/dev/null; then
+        current_image="$(sed -n 's/^PODCASTSYNC_IMAGE=//p' .env | head -n 1)"
+        if [[ "$current_image" != "$image" ]]; then
+            sed -i "s|^PODCASTSYNC_IMAGE=.*|PODCASTSYNC_IMAGE=${image}|" .env
+            say "-> Pinned PODCASTSYNC_IMAGE=${image} (--tag ${ref})"
+        fi
+    else
+        printf 'PODCASTSYNC_IMAGE=%s\n' "$image" >> .env
+        say "-> Pinned PODCASTSYNC_IMAGE=${image} (--tag ${ref})"
+    fi
 fi
 
 say "-> Pulling the latest image and starting PodcastSync"

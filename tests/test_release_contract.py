@@ -62,6 +62,12 @@ def test_release_workflow_builds_and_publishes_docker_image():
     assert "packages: write" in workflow
     assert "docker/build-push-action" in workflow
     assert "linux/amd64,linux/arm64" in workflow
+    # The published image must be exactly what compose/install pull: the name
+    # is pinned, not derived from the repository name.
+    assert "IMAGE_NAME: shay2000/podcastsync" in workflow
+    assert "IMAGE_NAME: ${{ github.repository }}" not in workflow
+    # Manual dispatch still produces the requested version tag.
+    assert "type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}" in workflow
     # A release must be verified by actually running the container.
     assert "Smoke test the built image" in workflow
     assert "api/status" in workflow
@@ -83,15 +89,48 @@ def test_linux_install_script_downloads_release_files_and_start_containers():
     assert "Docker is not installed" in script
     assert "the Docker Compose plugin is not available" in script
     assert "Docker is not running" in script
-    # Never binds the dashboard publicly by default.
+    # The dashboard is unauthenticated, so the bind address must be private:
+    # loopback/private-range validated, 0.0.0.0 and public addresses rejected.
     assert "--bind-ip)" in script
     assert 'bind_ip="127.0.0.1"' in script
-    assert "0.0.0.0" not in script
+    assert "refusing to bind 0.0.0.0" in script
+    assert "is_private_ip" in script
+    assert "refusing to bind public address" in script
     # Idempotent: keeps an existing .env, fetches fresh compose files.
     assert ".env already exists; leaving it unchanged" in script
+    # --tag pins the image so files and backend stay on the same release.
+    assert 'image="ghcr.io/shay2000/podcastsync:${ref#v}"' in script
+    assert 'sed -i "s|^PODCASTSYNC_IMAGE=.*|PODCASTSYNC_IMAGE=${image}|" .env' in script
     # Verifies the container became healthy before declaring success.
     assert '"Health":"healthy"' in script
     assert "docker compose logs" in script
+
+
+def test_install_script_rejects_public_bind_addresses():
+    """The installer must refuse to expose the unauthenticated dashboard."""
+    import subprocess
+
+    run = lambda args: subprocess.run(  # noqa: E731
+        ["bash", str(ROOT / "deploy" / "linux" / "install.sh")] + args,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    public = run(["--bind-ip", "203.0.113.10"])
+    assert public.returncode != 0
+    assert "refusing to bind public address" in public.stderr
+
+    wildcard = run(["--bind-ip", "0.0.0.0"])
+    assert wildcard.returncode != 0
+    assert "refusing to bind 0.0.0.0" in wildcard.stderr
+
+    # Private ranges and Tailscale CGNAT addresses are accepted (the script
+    # then fails later on missing Docker, never on the address itself).
+    for ok in ("127.0.0.1", "100.101.102.103", "192.168.1.10"):
+        result = run(["--bind-ip", ok])
+        assert "refusing to bind" not in result.stderr, f"{ok} should be allowed"
 
 
 def test_packaging_inventory_has_no_macos_leftovers():
