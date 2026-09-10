@@ -34,7 +34,14 @@ instructions exactly.
    Tailscale). Do not expose the dashboard to the public internet.
 5. Verify the install the way the repository's own instructions say to
    (health check, then the dashboard over the private address).
-6. Report back: the dashboard address to open, and what I should subscribe to
+6. If I want to listen with an app that needs public feeds (e.g. Overcast)
+   and I don't own a domain, set up a free DuckDNS name for me as described
+   in docs/ORACLE_VPS_HANDOFF.md (step "create the DNS record", DuckDNS
+   option). If you can control a browser (e.g. a BrowserOS or browser MCP
+   tool), offer to walk me through duckdns.org yourself — navigate and type
+   for me, but let me do the sign-in and any password/account steps myself.
+   Point the name at the server's public IPv4 address.
+7. Report back: the dashboard address to open, and what I should subscribe to
    in my podcast app.
 
 Rules: never expose port 8642 to the public internet, never print or commit

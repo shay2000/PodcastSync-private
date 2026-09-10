@@ -225,6 +225,24 @@ The owner does **not** need to own a domain:
   VPS's public IPv4. Everything else in the runbook is identical: Caddy gets
   an HTTPS certificate for the name automatically.
 
+If you have a browser-control tool available (a BrowserOS, Playwright, or
+similar MCP integration), **offer to do the DuckDNS browser work for the
+owner** — but only with these boundaries:
+
+1. Ask first: "I can open duckdns.org and fill in the form for you — want me
+   to?" Never start driving their browser unannounced.
+2. You may navigate to `https://www.duckdns.org`, create the subdomain name
+   (suggest something random-ish like `my-podcasts-7f3k` rather than a
+   guessable one), and type it into the form.
+3. Let the **owner** do the sign-in themselves (Google/GitHub/reddit account)
+   and any 2FA/captcha. Never ask for, type, or read their password or one-time
+   codes. If a login page appears, hand control back to them and wait.
+4. You may fill in the VPS public IPv4 as the IP value and hit save — read the
+   address yourself from the VPS (e.g. `curl -s https://api.ipify.org` on the
+   VPS, or from its cloud console) rather than asking the owner to type it.
+5. Verify afterwards from the VPS: `getent hosts <name>.duckdns.org` should
+   return the VPS public IPv4.
+
 Do not silently make the feed public; do not open port 8642 as a shortcut.
 
 ## Optional — YouTube sign-in cookies on the headless VPS

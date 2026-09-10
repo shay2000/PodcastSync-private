@@ -77,6 +77,14 @@ do not use a CNAME unless the provider specifically supplies a stable hostname.
 That single field is the whole DNS setup; nothing else to configure. Use
 `my-podcasts.duckdns.org` everywhere this runbook says `podcast.example.com`.
 
+**Agent-assisted setup:** if the coding agent has a browser-control tool
+(BrowserOS, Playwright, or a similar MCP integration), it can offer to do the
+browser part for the owner — navigating to duckdns.org, creating the
+subdomain, and entering the IP (which it should read from the VPS itself).
+The owner still performs the sign-in and any 2FA/captcha personally; the
+agent must never handle passwords or one-time codes. Ask before driving the
+owner's browser.
+
 If Cloudflare is being used, start with **DNS only** while Caddy obtains its
 certificate. The coding agent can switch to a proxy later after HTTPS has been
 verified.
