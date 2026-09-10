@@ -82,15 +82,50 @@ else
 fi
 
 base="https://raw.githubusercontent.com/${REPO}/${ref}"
+# Fetch deployment files. On an existing deployment, never clobber local
+# customizations (external volume mappings, cookie mounts, edited compose):
+# download to a side-by-side file and only replace the live one when the
+# operator has not modified it. Compose files are user-owned config, not
+# installer-owned state.
+existing_deployment=0
+[[ -f docker-compose.yml ]] && existing_deployment=1
+
 for f in docker-compose.yml docker-compose.cookies.yml .env.example deploy/caddy/Caddyfile.docker; do
     dest="$install_dir/$f"
     mkdir -p "$(dirname "$dest")"
-    if curl -fsSL "$base/$f" -o "$dest"; then
-        say "   fetched $f"
+    tmp="${dest}.installer-new"
+    if curl -fsSL "$base/$f" -o "$tmp"; then
+        if [[ "$existing_deployment" -eq 1 && -f "$dest" ]]; then
+            if cmp -s "$tmp" "$dest"; then
+                rm -f "$tmp"
+                say "   $f unchanged"
+            else
+                # The live file differs from the repo version. Replace only
+                # if the live file still matches the repo version this
+                # deployment was last installed from; otherwise keep the
+                # local edits and leave the update beside it for review.
+                if [[ -f "${dest}.installer-base" ]] && cmp -s "$dest" "${dest}.installer-base"; then
+                    mv "$tmp" "$dest"
+                    mv "$dest" "${dest}.installer-base" 2>/dev/null || true
+                    cp "$dest" "${dest}.installer-base"
+                    say "   updated $f"
+                else
+                    mv "$tmp" "${dest}.NEW"
+                    say "   kept local $f (modified); new version saved as ${f}.NEW for review"
+                fi
+            fi
+        else
+            mv "$tmp" "$dest"
+            cp "$dest" "${dest}.installer-base"
+            say "   fetched $f"
+        fi
     elif [[ "$f" == "docker-compose.cookies.yml" ]]; then
-        say "   skipped optional $f"
-        rm -f "$dest"
+        rm -f "$tmp"
+        if [[ "$existing_deployment" -eq 0 ]]; then
+            say "   skipped optional $f"
+        fi
     else
+        rm -f "$tmp"
         die "could not download $f from $base"
     fi
 done
