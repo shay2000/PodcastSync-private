@@ -77,9 +77,7 @@ class DatabaseManager:
                 logger.info("Applying migration %s", mf.name)
                 sql = mf.read_text()
                 script = (
-                    "BEGIN;\n"
-                    + sql
-                    + f"\nINSERT OR REPLACE INTO settings (key, value) "
+                    "BEGIN;\n" + sql + f"\nINSERT OR REPLACE INTO settings (key, value) "
                     f"VALUES ('schema_version', {version});\n"
                     "COMMIT;"
                 )
