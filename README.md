@@ -10,6 +10,38 @@ content.
 You run it once on a server (a small rented computer in the cloud), and after
 that it works on its own. It is private: only you can reach it.
 
+## Don't want to do it yourself? Give this to your AI assistant
+
+If you use an AI assistant that can run commands for you (Claude Code, Codex,
+Cursor, Kilo, and the like), copy everything in the box below, paste it into a
+chat with it, and it will set the whole thing up for you, checking with you
+whenever it needs a decision. It works whether you and the assistant are
+sitting on the server, or on your own computer while the server is elsewhere.
+
+```text
+Please set up PodcastSync for me on my server, following the repository's own
+instructions exactly.
+
+1. Find the PodcastSync repository on this machine (look for a folder
+   containing an AGENTS.md file and a deploy/ folder), or clone it from
+   https://github.com/shay2000/PodcastSync-private if it is not here yet.
+2. Read AGENTS.md and README.md in that folder. They are the source of truth.
+3. If the server is a different machine from this one, work over SSH; ask me
+   for the SSH login when you need it.
+4. Install and start PodcastSync with the repository's installer:
+   deploy/linux/install.sh (run it as shown in README.md section "Setting it
+   up", with --bind-ip set to the server's Tailscale address if we use
+   Tailscale). Do not expose the dashboard to the public internet.
+5. Verify the install the way the repository's own instructions say to
+   (health check, then the dashboard over the private address).
+6. Report back: the dashboard address to open, and what I should subscribe to
+   in my podcast app.
+
+Rules: never expose port 8642 to the public internet, never print or commit
+secrets, and if anything fails, stop and tell me before trying a fix you
+invented yourself.
+```
+
 ## What it does
 
 1. You add YouTube channels you like (for example, a cooking channel or a
