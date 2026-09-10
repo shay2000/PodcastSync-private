@@ -107,7 +107,12 @@ def test_linux_install_script_downloads_release_files_and_start_containers():
 
 
 def test_install_script_rejects_public_bind_addresses():
-    """The installer must refuse to expose the unauthenticated dashboard."""
+    """The installer must refuse to expose the unauthenticated dashboard.
+
+    Only the reject paths are executed: with a valid address the script
+    proceeds to Docker/network work, which has no place in a hermetic test.
+    The accept side is covered by asserting the validation logic instead.
+    """
     import subprocess
 
     run = lambda args: subprocess.run(  # noqa: E731
@@ -126,11 +131,58 @@ def test_install_script_rejects_public_bind_addresses():
     assert wildcard.returncode != 0
     assert "refusing to bind 0.0.0.0" in wildcard.stderr
 
-    # Private ranges and Tailscale CGNAT addresses are accepted (the script
-    # then fails later on missing Docker, never on the address itself).
-    for ok in ("127.0.0.1", "100.101.102.103", "192.168.1.10"):
-        result = run(["--bind-ip", ok])
-        assert "refusing to bind" not in result.stderr, f"{ok} should be allowed"
+
+def test_install_script_bind_ip_allowlist_covers_private_ranges():
+    """The is_private_ip guard accepts exactly the safe ranges, statically.
+
+    Executes the guard function itself (no Docker/network) against loopback,
+    RFC1918, and Tailscale CGNAT addresses, and rejects public/wildcard ones.
+    """
+    import subprocess
+
+    script = (ROOT / "deploy" / "linux" / "install.sh").read_text(encoding="utf-8")
+    # Extract the guard function and run it in isolation.
+    start = script.index("is_private_ip() {")
+    end = script.index("\n}\n", start) + 3
+    guard = script[start:end]
+
+    probe = subprocess.run(
+        [
+            "bash",
+            "-c",
+            guard + '\nfor ip in "$@"; do is_private_ip "$ip" && echo ok || echo no; done',
+            "bash",
+            "127.0.0.1",
+            "10.0.0.5",
+            "192.168.1.10",
+            "172.20.0.1",
+            "100.101.102.103",
+            "100.64.0.1",
+            "8.8.8.8",
+            "203.0.113.10",
+            "0.0.0.0",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert probe.returncode == 0, probe.stderr
+    private = [
+        "127.0.0.1",
+        "10.0.0.5",
+        "192.168.1.10",
+        "172.20.0.1",
+        "100.101.102.103",
+        "100.64.0.1",
+    ]
+    public = ["8.8.8.8", "203.0.113.10", "0.0.0.0"]
+    results = probe.stdout.split()
+    assert len(results) == len(private) + len(public), f"unexpected output: {probe.stdout!r}"
+    for ip, result in zip(private, results[: len(private)], strict=True):
+        assert result == "ok", f"{ip} should be accepted as private"
+    for ip, result in zip(public, results[len(private) :], strict=True):
+        assert result == "no", f"{ip} should be rejected as public"
 
 
 def test_packaging_inventory_has_no_macos_leftovers():
