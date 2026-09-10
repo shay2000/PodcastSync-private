@@ -100,7 +100,15 @@ def test_linux_install_script_downloads_release_files_and_start_containers():
     assert ".env already exists; leaving it unchanged" in script
     # --tag pins the image so files and backend stay on the same release.
     assert 'image="ghcr.io/shay2000/podcastsync:${ref#v}"' in script
-    assert 'sed -i "s|^PODCASTSYNC_IMAGE=.*|PODCASTSYNC_IMAGE=${image}|" .env' in script
+    # .env updates go through a sed wrapper portable across GNU/BSD.
+    assert "set_env_value() {" in script
+    assert 'sed -i "s|^PODCASTSYNC_IMAGE=.*' not in script
+    # Re-running with a different --bind-ip must update .env, not silently
+    # keep the old address while the success message shows the new one.
+    assert "Updated PODCASTSYNC_BIND_IP=" in script
+    assert "Updated PODCASTSYNC_PUBLIC_URL=" in script
+    # A custom public URL (HTTPS profile) survives a bind change.
+    assert '"$current_url" == "http://${current_bind}:8642"' in script
     # Verifies the container became healthy before declaring success.
     assert '"Health":"healthy"' in script
     assert "docker compose logs" in script
@@ -183,6 +191,104 @@ def test_install_script_bind_ip_allowlist_covers_private_ranges():
         assert result == "ok", f"{ip} should be accepted as private"
     for ip, result in zip(public, results[len(private) :], strict=True):
         assert result == "no", f"{ip} should be rejected as public"
+
+
+def test_install_script_updates_env_on_re_run(tmp_path):
+    """Re-running with a different --bind-ip or --tag must sync .env.
+
+    Runs the installer end-to-end with stubbed docker/curl (no network, no
+    containers): first install, then a re-run with a different Tailscale
+    address, then a --tag re-run. Asserts the .env contents after each.
+    """
+    import os
+    import subprocess
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    install_dir = tmp_path / "ps"
+
+    # Stub docker: passes the preflight, reports a healthy container.
+    (bin_dir / "docker").write_text(
+        "#!/bin/bash\n"
+        'if [[ "$1" == "compose" ]]; then\n'
+        '  case "$2" in version|pull|up) exit 0 ;;\n'
+        '    ps) echo \'[{"Name":"podcastsync","Health":"healthy"}]\'; exit 0 ;;\n'
+        "  esac\n"
+        "fi\n"
+        '[[ "$1" == "info" || "$1" == "version" ]] && exit 0\n'
+        "exit 1\n"
+    )
+    # Stub curl: "downloads" each file as an empty stub.
+    (bin_dir / "curl").write_text(
+        "#!/bin/bash\n"
+        'out=""; args=("$@")\n'
+        "for ((i=0; i<${#args[@]}; i++)); do\n"
+        '  [[ "${args[$i]}" == "-o" ]] && out="${args[$((i+1))]}"\n'
+        "done\n"
+        '[[ -n "$out" ]] && : > "$out" && exit 0\n'
+        "exit 1\n"
+    )
+    for stub in bin_dir.iterdir():
+        stub.chmod(0o755)
+
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "HOME": str(home),
+        "PODCASTSYNC_INSTALL_DIR": str(install_dir),
+    }
+    script = str(ROOT / "deploy" / "linux" / "install.sh")
+
+    def run_installer(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["bash", script, *args],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+            env=env,
+        )
+
+    def env_file() -> str:
+        return (install_dir / ".env").read_text(encoding="utf-8")
+
+    first = run_installer("--bind-ip", "100.100.1.2")
+    assert first.returncode == 0, first.stderr
+    assert "PODCASTSYNC_BIND_IP=100.100.1.2" in env_file()
+    assert "PODCASTSYNC_PUBLIC_URL=http://100.100.1.2:8642" in env_file()
+    assert "PODCASTSYNC_IMAGE=" not in env_file()
+
+    # Bind change: .env must follow, including the default public URL.
+    moved = run_installer("--bind-ip", "100.100.9.9")
+    assert moved.returncode == 0, moved.stderr
+    assert "PODCASTSYNC_BIND_IP=100.100.9.9" in env_file()
+    assert "PODCASTSYNC_BIND_IP=100.100.1.2" not in env_file()
+    assert "PODCASTSYNC_PUBLIC_URL=http://100.100.9.9:8642" in env_file()
+
+    # A custom public URL (public HTTPS profile) survives a bind change.
+    (install_dir / ".env").write_text(
+        (install_dir / ".env")
+        .read_text()
+        .replace(
+            "PODCASTSYNC_PUBLIC_URL=http://100.100.9.9:8642",
+            "PODCASTSYNC_PUBLIC_URL=https://podcast.example.com",
+        )
+    )
+    custom = run_installer("--bind-ip", "100.100.1.5")
+    assert custom.returncode == 0, custom.stderr
+    assert "PODCASTSYNC_BIND_IP=100.100.1.5" in env_file()
+    assert "PODCASTSYNC_PUBLIC_URL=https://podcast.example.com" in env_file()
+
+    # Tag pin: image line is added and then updated on a --tag change.
+    pinned = run_installer("--bind-ip", "100.100.1.5", "--tag", "v0.3.0")
+    assert pinned.returncode == 0, pinned.stderr
+    assert "PODCASTSYNC_IMAGE=ghcr.io/shay2000/podcastsync:0.3.0" in env_file()
+    repinned = run_installer("--bind-ip", "100.100.1.5", "--tag", "v0.3.1")
+    assert repinned.returncode == 0, repinned.stderr
+    assert "PODCASTSYNC_IMAGE=ghcr.io/shay2000/podcastsync:0.3.1" in env_file()
+    assert "PODCASTSYNC_IMAGE=ghcr.io/shay2000/podcastsync:0.3.0" not in env_file()
 
 
 def test_packaging_inventory_has_no_macos_leftovers():

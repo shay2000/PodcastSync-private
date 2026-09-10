@@ -111,18 +111,41 @@ else
     say "-> .env already exists; leaving it unchanged."
 fi
 
+# Update a KEY=VALUE line in .env in place (portable across GNU/BSD sed).
+set_env_value() {
+    local key="$1" value="$2"
+    if grep -q "^${key}=" .env 2>/dev/null; then
+        sed -i.bak "s|^${key}=.*|${key}=${value}|" .env && rm -f .env.bak
+    else
+        printf '%s=%s\n' "$key" "$value" >> .env
+    fi
+}
+
 # A --tag install is a pinned install: make sure the running image matches the
 # fetched deployment files, updating the pin when the operator changes --tag.
 if [[ -n "$image" ]]; then
-    if grep -q '^PODCASTSYNC_IMAGE=' .env 2>/dev/null; then
-        current_image="$(sed -n 's/^PODCASTSYNC_IMAGE=//p' .env | head -n 1)"
-        if [[ "$current_image" != "$image" ]]; then
-            sed -i "s|^PODCASTSYNC_IMAGE=.*|PODCASTSYNC_IMAGE=${image}|" .env
-            say "-> Pinned PODCASTSYNC_IMAGE=${image} (--tag ${ref})"
-        fi
-    else
-        printf 'PODCASTSYNC_IMAGE=%s\n' "$image" >> .env
+    current_image="$(sed -n 's/^PODCASTSYNC_IMAGE=//p' .env | head -n 1)"
+    if [[ "$current_image" != "$image" ]]; then
+        set_env_value PODCASTSYNC_IMAGE "$image"
         say "-> Pinned PODCASTSYNC_IMAGE=${image} (--tag ${ref})"
+    fi
+fi
+
+# Keep the bind address in .env in sync with this run's --bind-ip. Without
+# this, re-running the installer with a different address leaves the old one
+# active while the success message claims the new one.
+if [[ -f .env ]]; then
+    current_bind="$(sed -n 's/^PODCASTSYNC_BIND_IP=//p' .env | head -n 1)"
+    if [[ -n "$current_bind" && "$current_bind" != "$bind_ip" ]]; then
+        set_env_value PODCASTSYNC_BIND_IP "$bind_ip"
+        say "-> Updated PODCASTSYNC_BIND_IP=${bind_ip} (was ${current_bind})"
+        # The default public URL tracks the bind address unless the operator
+        # set a custom one (public HTTPS profile).
+        current_url="$(sed -n 's/^PODCASTSYNC_PUBLIC_URL=//p' .env | head -n 1)"
+        if [[ "$current_url" == "http://${current_bind}:8642" ]]; then
+            set_env_value PODCASTSYNC_PUBLIC_URL "http://${bind_ip}:8642"
+            say "-> Updated PODCASTSYNC_PUBLIC_URL=http://${bind_ip}:8642"
+        fi
     fi
 fi
 
