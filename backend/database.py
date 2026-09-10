@@ -13,6 +13,28 @@ logger = logging.getLogger(__name__)
 
 MIGRATIONS_DIR = resource_path("migrations")
 
+# Columns these helpers may write. update_source/update_video_status build SQL
+# dynamically from caller-supplied field names; only allowlisted columns are
+# ever substituted into the statement text.
+SOURCE_UPDATE_COLUMNS = frozenset(
+    {
+        "name",
+        "enabled",
+        "max_backfill",
+        "custom_storage_path",
+        "icon_url",
+        "max_keep_episodes",
+    }
+)
+VIDEO_UPDATE_COLUMNS = frozenset({"file_path", "file_size", "error_message"})
+
+
+def _checked_fields(fields: dict[str, Any], allowed: frozenset[str], method: str) -> dict[str, Any]:
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"{method}: invalid field(s): {', '.join(sorted(unknown))}")
+    return fields
+
 
 class DatabaseManager:
     def __init__(self, db_path: Path) -> None:
@@ -39,7 +61,13 @@ class DatabaseManager:
     # ------------------------------------------------------------------
 
     def initialize(self) -> None:
-        """Create the database and apply pending migrations."""
+        """Create the database and apply pending migrations atomically.
+
+        Each migration runs inside an explicit transaction together with its
+        schema-version bump, so a failure rolls the whole file back instead of
+        leaving a half-applied schema (executescript is otherwise autocommit).
+        Migration files must not contain their own BEGIN/COMMIT statements.
+        """
         current_version = self._get_schema_version()
         migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
 
@@ -48,14 +76,23 @@ class DatabaseManager:
             if version > current_version:
                 logger.info("Applying migration %s", mf.name)
                 sql = mf.read_text()
-                self.conn.executescript(sql)
-                self._set_schema_version(version)
+                script = (
+                    "BEGIN;\n" + sql + f"\nINSERT OR REPLACE INTO settings (key, value) "
+                    f"VALUES ('schema_version', {version});\n"
+                    "COMMIT;"
+                )
+                try:
+                    with self.conn:
+                        self.conn.executescript(script)
+                except sqlite3.Error:
+                    logger.exception("Migration %s failed; rolled back", mf.name)
+                    raise
+                current_version = version
 
-        self.conn.commit()
         logger.info(
             "Database initialized at %s (schema v%d)",
             self.db_path,
-            self._get_schema_version(),
+            current_version,
         )
 
     def _get_schema_version(self) -> int:
@@ -66,13 +103,6 @@ class DatabaseManager:
             return int(row["value"]) if row else 0
         except sqlite3.OperationalError:
             return 0
-
-    def _set_schema_version(self, version: int) -> None:
-        self.conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES ('schema_version', ?)",
-            (str(version),),
-        )
-        self.conn.commit()
 
     # ------------------------------------------------------------------
     # Generic helpers
@@ -149,6 +179,9 @@ class DatabaseManager:
         return self.fetch_all("SELECT * FROM sources WHERE enabled = 1 ORDER BY created_at DESC")
 
     def update_source(self, source_id: int, **fields: Any) -> None:
+        fields = _checked_fields(fields, SOURCE_UPDATE_COLUMNS, "update_source")
+        if not fields:
+            return
         sets = ", ".join(f"{k} = ?" for k in fields)
         vals = list(fields.values()) + [source_id]
         self.execute(
@@ -219,6 +252,7 @@ class DatabaseManager:
         )
 
     def update_video_status(self, video_id: int, status: str, **fields: Any) -> None:
+        fields = _checked_fields(fields, VIDEO_UPDATE_COLUMNS, "update_video_status")
         extra = "".join(f", {k} = ?" for k in fields)
         vals = [status] + list(fields.values()) + [video_id]
         self.execute(f"UPDATE videos SET download_status = ?{extra} WHERE id = ?", tuple(vals))

@@ -50,32 +50,38 @@ async def pick_directory() -> dict:
     return {"path": path}
 
 
-@router.patch("/settings", response_model=SettingsResponse)
-async def update_settings(body: SettingsUpdate, request: Request) -> dict:
+def _apply_setting(request: Request, key: str, value) -> None:
+    """Persist one settings field to app state and the database.
+
+    Field-specific side effects (API-key forwarding to the orchestrator,
+    scheduler rescheduling) are handled here so the PATCH route stays flat.
+    ``key`` comes from ``SettingsUpdate.model_dump``, so it is always a known
+    settings field.
+    """
     db = request.app.state.db
     settings = request.app.state.settings
-    orchestrator = request.app.state.orchestrator
 
-    if body.youtube_api_key is not None:
-        settings.youtube_api_key = body.youtube_api_key
-        db.set_setting("youtube_api_key", body.youtube_api_key)
-        orchestrator.update_api_key(body.youtube_api_key)
+    setattr(settings, key, value)
+    db.set_setting(key, str(value))
 
-    if body.poll_interval_minutes is not None:
-        settings.poll_interval_minutes = body.poll_interval_minutes
-        db.set_setting("poll_interval_minutes", str(body.poll_interval_minutes))
+    if key == "youtube_api_key":
+        request.app.state.orchestrator.update_api_key(value)
+    elif key == "poll_interval_minutes":
         scheduler = getattr(request.app.state, "scheduler", None)
         if scheduler and scheduler.running:
             from backend.scheduler import reschedule_poll
 
             reschedule_poll(scheduler, settings.poll_interval_minutes)
 
-    if body.cookies_from_browser is not None:
-        settings.cookies_from_browser = body.cookies_from_browser
-        db.set_setting("cookies_from_browser", body.cookies_from_browser)
 
-    if body.cookies_file_path is not None:
-        settings.cookies_file_path = body.cookies_file_path
-        db.set_setting("cookies_file_path", body.cookies_file_path)
+@router.patch("/settings", response_model=SettingsResponse)
+async def update_settings(body: SettingsUpdate, request: Request) -> dict:
+    settings = request.app.state.settings
+
+    # exclude_unset keeps PATCH partial; explicitly-sent nulls are skipped,
+    # matching the original per-field "is not None" guards.
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    for key, value in updates.items():
+        _apply_setting(request, key, value)
 
     return settings_to_response(settings)

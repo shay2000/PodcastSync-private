@@ -19,6 +19,19 @@ def _feed_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+def _feed_summary(dto: dict, base_url: str) -> dict:
+    """Public summary of one feed for the /feeds listing."""
+    return {
+        "id": dto["id"],
+        "name": dto["name"],
+        "source_type": dto["source_type"],
+        "enabled": dto["enabled"],
+        "feed_url": f"{base_url}/feed/{dto['id']}.xml",
+        "video_count": dto["video_count"],
+        "completed_count": dto["completed_count"],
+    }
+
+
 @router.get("/feed/{source_id}.xml")
 async def get_feed(source_id: int, request: Request) -> Response:
     """Serve the podcast RSS feed for a specific source."""
@@ -46,18 +59,4 @@ async def list_feeds(request: Request) -> list[dict]:
 
     base_url = _feed_base_url(request)
     sources = db.get_all_sources()
-    feeds = []
-    for s in sources:
-        dto = source_dto(db, s)
-        feeds.append(
-            {
-                "id": dto["id"],
-                "name": dto["name"],
-                "source_type": dto["source_type"],
-                "enabled": dto["enabled"],
-                "feed_url": f"{base_url}/feed/{dto['id']}.xml",
-                "video_count": dto["video_count"],
-                "completed_count": dto["completed_count"],
-            }
-        )
-    return feeds
+    return [_feed_summary(source_dto(db, s), base_url) for s in sources]
