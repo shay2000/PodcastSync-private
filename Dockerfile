@@ -24,12 +24,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt ./
-# requirements.txt also serves the macOS PyInstaller build. Keep that
-# build-only dependency out of the runtime image.
-RUN grep -viE '^pyinstaller([<=>!~]|$)' requirements.txt \
-    > /tmp/requirements-runtime.txt \
-    && pip install --no-cache-dir -r /tmp/requirements-runtime.txt \
-    && rm /tmp/requirements-runtime.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
 

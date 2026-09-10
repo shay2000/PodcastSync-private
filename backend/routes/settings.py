@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -32,26 +31,6 @@ def settings_to_response(settings) -> dict:
 @router.get("/settings", response_model=SettingsResponse)
 async def get_settings(request: Request) -> dict:
     return settings_to_response(request.app.state.settings)
-
-
-@router.post("/pick-directory")
-async def pick_directory() -> dict:
-    """Open a native macOS folder picker and return its selected path."""
-    try:
-        result = subprocess.run(
-            [
-                "osascript",
-                "-e",
-                'POSIX path of (choose folder with prompt "Select download folder")',
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        path = result.stdout.strip() if result.returncode == 0 else None
-    except Exception:
-        path = None
-    return {"path": path}
 
 
 def _apply_setting(request: Request, key: str, value) -> None:

@@ -13,7 +13,6 @@ import {
     subscribe,
 } from "./store.js";
 import {
-    browseDirectory,
     cancelDetailDelete,
     closeDetail,
     confirmDeleteDetailSource,
@@ -137,9 +136,6 @@ document.addEventListener("click", (event) => {
             break;
         case "confirm-delete-detail-source":
             confirmDeleteDetailSource();
-            break;
-        case "browse-directory":
-            void browseDirectory(target.dataset.inputId);
             break;
         case "save-detail-path":
             void saveDetailPath();

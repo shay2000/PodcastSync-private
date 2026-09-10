@@ -146,15 +146,21 @@ Explain what these mean in plain terms:
 
 ## Gate 4 — Build and start
 
+The compose file defaults to the published image (`ghcr.io/shay2000/podcastsync:latest`),
+so starting does not require building anything:
+
 ```bash
 cd ~/podcastsync
-docker compose up -d --build
+docker compose up -d
 docker compose ps
 docker compose logs --tail=100 podcastsync
 ```
 
+If the repo was rsynced or cloned and a local build is explicitly wanted, use
+`docker compose up -d --build` instead.
+
 Wait until the `podcastsync` container reports **healthy** (the Compose file
-defines a healthcheck). If the build or start fails, read the logs, fix what is
+defines a healthcheck). If the pull or start fails, read the logs, fix what is
 in your control, and otherwise stop and ask.
 
 ## Gate 5 — Verify from the VPS
@@ -227,7 +233,7 @@ Then, in the repo dir on the VPS:
 ```bash
 cd ~/podcastsync
 chmod 600 cookies.txt
-docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d
 docker compose exec -T podcastsync python -c '
 import json, urllib.request
 data = json.dumps({"cookies_file_path": "/data/cookies.txt"}).encode()
@@ -249,7 +255,7 @@ Give the owner a short final summary containing:
   `docker run --rm -v podcastsync-data:/data -v $(pwd):/backup alpine tar czf /backup/podcastsync-data-$(date +%F).tgz -C /data .`
 - How to update later: replace the code (re-run the rsync from the Mac, or
   `git pull --ff-only` if the repo is a git checkout), then
-  `docker compose up -d --build`. Never touch the existing `.env`.
+  `docker compose up -d`. Never touch the existing `.env`.
 - Logs and health: `docker compose logs -f podcastsync` and `docker compose ps`.
 - A reminder to keep `.env` and `cookies.txt` private (mode `600`) and never to
   open port 8642 to the public internet.

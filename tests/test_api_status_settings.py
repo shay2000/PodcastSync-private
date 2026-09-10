@@ -2,8 +2,6 @@
 
 Not covered here, deliberately:
 
-* ``POST /api/pick-directory`` shells out to osascript and opens a native folder
-  picker, so it cannot run unattended.
 * ``GET /api/cookies/detect`` and the yt-dlp probe inside ``POST /api/cookies/test``
   read real browser cookie stores and reach YouTube. Only the guard that runs
   before any yt-dlp work is exercised below.

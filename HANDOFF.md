@@ -1,84 +1,68 @@
 # HANDOFF.md
 
 ## Overview
-PodcastSync is a macOS menu bar app that turns YouTube channels and playlists into self-hosted podcast feeds. It has:
+PodcastSync is a self-hosted server that turns YouTube channels and playlists
+into podcast RSS feeds. The deployment target is a Linux VPS running Docker,
+with the dashboard reached privately over Tailscale (or an SSH tunnel); an
+optional public Caddy profile exposes only HTTPS feed/audio paths.
 
-- a Python backend built with FastAPI
-- a Swift menu bar wrapper that launches and monitors that backend
-- a packaged `.app` and `.dmg` for end users
+It has:
 
-Current packaged outputs:
+- a Python backend built with FastAPI (the whole product)
+- a Docker image published to GHCR on every release tag
+- a one-command Linux install script for Docker hosts
 
-- `build/PodcastSync.app`
-- `build/PodcastSync.dmg`
+Current packaged output:
 
-The current DMG is intended to be self-contained for end users. It bundles:
-
-- the Python backend
-- `yt-dlp`
-- `ffmpeg`
-- `ffprobe`
+- `ghcr.io/shay2000/podcastsync:<version>` (linux/amd64 + linux/arm64)
+- release assets: `install.sh` + a tarball of the compose files
 
 ## Current state
 Recent work completed:
 
-- major frontend redesign
-- dashboard overview with library pulse, summary cards, per-source progress,
-  and always-visible RSS feed details
-- system-native typography and accessibility affordances (keyboard focus and
-  reduced-motion support)
-- shared app/browser branding icon
-- bundled `ffmpeg` and `ffprobe` inside the app
-- rewritten dylib paths so the packaged app does not depend on Homebrew on the target machine
-- rebuilt standalone DMG packaging
+- major frontend redesign (dashboard overview, per-source progress, feed details)
+- Docker packaging hardened by contract tests (loopback-only publish, non-root
+  user, Python healthcheck, no secrets in compose)
+- optional Caddy `public` profile that publishes only `/feed/*` and `/audio/*`
+- optional read-only cookie-file mount for yt-dlp sign-in downloads
+- macOS menu bar app and PyInstaller/DMG packaging removed — the product is
+  Docker-on-Linux only now
+- release pipeline builds the image on GHCR and smoke-tests the container
 
 ## Stack
-- Python 3.12 in `./venv`
+- Python 3.10+ (3.12 in the image)
 - FastAPI + uvicorn
-- yt-dlp
-- feedgen
-- APScheduler
-- SQLite
-- Swift / SwiftUI / MenuBarExtra
-- PyInstaller
+- yt-dlp (+ yt-dlp-ejs and a Node 22 runtime for YouTube extraction)
+- feedgen, APScheduler, SQLite
+- Docker + Compose; Caddy 2 for the optional public profile
 
 ## Key files
 - `backend/main.py`: FastAPI entrypoint
 - `backend/services/`: source creation, sync orchestration, cookie probing, and path helpers
 - `backend/downloader/`: download manager, ffmpeg discovery, and MP3 artwork helpers
-- `backend/routes/api.py`: thin `/api` route aggregator
-- `backend/routes/`: source, video, sync, status, settings, and cookie API routes
-- `backend/routes/feeds.py`: RSS feed routes
-- `backend/static/index.html`: frontend shell
-- `backend/static/js/main.js`: frontend entrypoint and delegated event wiring
-- `backend/static/js/`: frontend API, store, render, action, modal, and polling modules
-- `backend/static/css/main.css`: frontend stylesheet entrypoint
-- `backend/static/css/`: token, base, layout, and component styles
-- `backend/static/css/components/dashboard.css`: current dashboard surfaces
-- `backend/static/app-icon.svg`: shared app/browser icon source
-- `macos/PodcastSync/Sources/PodcastSyncApp.swift`: menu bar app UI
-- `macos/PodcastSync/Sources/BackendProcess.swift`: backend process startup
+- `backend/routes/`: thin HTTP layer (`api.py` aggregates `/api/*`; feeds and audio mount at root)
+- `backend/static/`: vanilla-JS web UI (no framework, no bundler)
+- `Dockerfile` / `docker-compose.yml` / `docker-compose.cookies.yml`: container packaging
+- `deploy/linux/install.sh`: one-command Linux installer (curl | bash)
+- `deploy/caddy/Caddyfile.docker`: public HTTPS feed proxy for the `public` profile
+- `deploy/oracle/install.sh`: domain-based Oracle VPS installer (public profile)
 - `scripts/dev.sh`: local dev run
-- `scripts/build_backend.sh`: PyInstaller backend bundle
-- `scripts/build_app.sh`: app and DMG build
-- `scripts/bundle_macos_tool.sh`: bundles `ffmpeg`/`ffprobe` and rewrites dylib references
-- `scripts/generate_app_icon.swift`: generates the icon raster assets
-- `deploy/oracle/install.sh`: idempotent Oracle VPS + Docker starter
+- `scripts/check_version.sh`: release tag ↔ pyproject version guard
+- `.github/workflows/build-release.yml`: Docker image build + release publishing
 - `docs/ORACLE_VPS_HANDOFF.md`: owner and coding-agent deployment runbook
+- `docs/HERMES_VPS_ONBOARD_PROMPT.md`: Tailscale-only deployment prompt for coding agents
 
-## Run locally
+## Run locally (dev)
 ```bash
-cd "<repo root, e.g. ~/Documents/Side Projects:Hobbies/Coding/PodcastSync>"
+cd "<repo root>"
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-brew install ffmpeg
+# ffmpeg must be on PATH (apt install ffmpeg / brew install ffmpeg)
 ./scripts/dev.sh
 ```
 
-Then open:
-
-- `http://127.0.0.1:8642`
+Then open http://127.0.0.1:8642
 
 ## Running tests
 
@@ -88,56 +72,50 @@ Install the optional development dependencies into the project environment, then
 source venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m pytest tests/ -q
+ruff check backend tests && ruff format --check backend tests
 ```
 
 The characterization suite is offline: it uses temporary SQLite/storage paths and
 replaces the YouTube fetcher and download manager after application startup.
 
-## Oracle VPS / Docker deployment
+## Deployment
 
-The supported public deployment is:
+Private (Tailscale-only) — the default:
 
 ```bash
-cp .env.example .env
-# Set PODCASTSYNC_DOMAIN and PODCASTSYNC_PUBLIC_URL in .env.
-docker compose --profile public up -d --build
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh \
+  | bash -s -- --bind-ip <tailscale-ipv4>
 ```
 
-The backend remains on `127.0.0.1:8642` by default; Caddy publishes only the
-feed and audio paths. Use an SSH tunnel to open the dashboard. Read
-`docs/ORACLE_VPS_HANDOFF.md` before deploying for DNS, Oracle VCN, HTTPS,
-headless YouTube cookies, and maintenance guidance.
+Dashboard: `http://<tailscale-ipv4>:8642`, reachable only from the Tailnet.
+See `docs/HERMES_VPS_ONBOARD_PROMPT.md` for the full gate-by-gate runbook.
 
-## Build packaged app
+Public feeds (optional):
+
 ```bash
-cd "<repo root>"
-source venv/bin/activate
-pip install -r requirements.txt
-brew install ffmpeg
-./scripts/build_app.sh
+cp .env.example .env   # set PODCASTSYNC_DOMAIN + PODCASTSYNC_PUBLIC_URL
+docker compose --profile public up -d
 ```
 
-Outputs:
+Read `docs/ORACLE_VPS_HANDOFF.md` before enabling the public profile (DNS,
+Oracle VCN, HTTPS, cookies, maintenance).
 
-- `build/PodcastSync.app`
-- `build/PodcastSync.dmg`
+## Release process
 
-## User install flow
-1. Download `PodcastSync.dmg` from the GitHub Releases page.
-2. Open the DMG.
-3. Drag `PodcastSync.app` into Applications.
-4. Right-click `PodcastSync.app` and choose `Open` on first launch because the app is ad-hoc signed, not notarized.
+1. Bump `version` in `pyproject.toml`
+2. Tag `vX.Y.Z` and push the tag
+3. CI (`build-release.yml`) runs tests, builds and pushes
+   `ghcr.io/shay2000/podcastsync` (version + latest tags), smoke-tests the
+   container, and attaches `install.sh` + the compose tarball to the GitHub
+   release
+4. Servers update by re-running the install script (it pulls the new image
+   and re-creates the container; data persists in the `podcastsync-data` volume)
 
 ## Known limitations
-- The app is ad-hoc signed, not notarized.
-- Overcast is known not to work reliably with PodcastSync feeds. Apple Podcasts and Downcast are better-supported clients.
+- Overcast requires the public HTTPS profile; Apple Podcasts and Downcast work
+  with private/Tailscale URLs.
 - A YouTube Data API key is not a YouTube sign-in; downloads that require an
-  account need browser cookies or a Netscape-format cookie file.
-- Without a YouTube API key, RSS fallback only exposes roughly the latest 15 videos from a channel.
+  account need a Netscape-format cookie file.
+- Without a YouTube API key, RSS fallback only exposes roughly the latest 15 videos.
 - Podcast clients cache feeds aggressively.
 - The server must be running for clients to fetch feeds and audio.
-
-## Notes
-- `macos/PodcastSync/.build/` is local Swift build output and should not be committed.
-- `build/` is packaging output and scratch space. The main user-facing artifact is `build/PodcastSync.dmg`.
-- If packaging fails, likely causes are Swift toolchain issues, `hdiutil`, or macOS extended attributes interfering with codesign.

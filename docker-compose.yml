@@ -1,9 +1,12 @@
 # PodcastSync — safe-by-default Docker Compose.
 #
+# By default the backend runs the published image from GHCR
+# (ghcr.io/shay2000/podcastsync). Set PODCASTSYNC_IMAGE to run a different
+# tag, or run with --build to force a local build from the repository.
+#
 # The backend is published on the host address selected by
 # PODCASTSYNC_BIND_IP (loopback by default), which makes it reachable through
-# an SSH tunnel for the administrator. A private Tailscale address can be
-# selected when another local service already owns 127.0.0.1:8642. The
+# an SSH tunnel or a private Tailscale address for the administrator. The
 # optional `public` profile adds a Caddy container that publishes only HTTPS
 # podcast feeds and audio; the dashboard and /api remain private. Never
 # publish 8642 to 0.0.0.0.
@@ -13,13 +16,14 @@
 # or a local .env file, so no secret is embedded here.
 services:
   podcastsync:
+    image: ${PODCASTSYNC_IMAGE:-ghcr.io/shay2000/podcastsync:latest}
     build: .
     container_name: podcastsync
     restart: unless-stopped
     ports:
       - "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642"
     environment:
-      - PODCASTSYNC_PUBLIC_URL=${PODCASTSYNC_PUBLIC_URL:?set to https://your.domain}
+      - PODCASTSYNC_PUBLIC_URL=${PODCASTSYNC_PUBLIC_URL:?set to your URL, e.g. http://<tailscale-ip>:8642}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
       - PODCASTSYNC_POLL_INTERVAL=${PODCASTSYNC_POLL_INTERVAL:-30}
     volumes:

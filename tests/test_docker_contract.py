@@ -6,13 +6,12 @@ the safety and integration requirements of Phase 6 V3 (docs/implementation/
 phase6-vps.md):
 
 * ``Dockerfile`` — Python 3.12 slim base; apt installs only ffmpeg and
-  ``ca-certificates`` with ``--no-install-recommends``; runtime dependencies are
-  filtered from ``requirements.txt`` so build-only PyInstaller is excluded;
-  only the ``backend`` package is copied into the image; the app runs as a
-  non-root ``podcastsync`` user with a writable ``/data``; port 8642 is
-  exposed; the healthcheck uses Python (no curl anywhere); the CMD starts
-  ``backend.main:app`` under uvicorn on ``0.0.0.0:8642`` with proxy-header
-  trust only from ``127.0.0.1``.
+  ``ca-certificates`` with ``--no-install-recommends``; runtime dependencies
+  come straight from ``requirements.txt``; only the ``backend`` package is
+  copied into the image; the app runs as a non-root ``podcastsync`` user with
+  a writable ``/data``; port 8642 is exposed; the healthcheck uses Python (no
+  curl anywhere); the CMD starts ``backend.main:app`` under uvicorn on
+  ``0.0.0.0:8642`` with proxy-header trust only from ``127.0.0.1``.
 * ``docker-compose.yml`` — safe by default: named persistent ``/data`` volume,
   ``restart: unless-stopped``, the host port defaults to ``127.0.0.1`` and can
   only be overridden with an explicit bind address, and PUBLIC_URL / API key /
@@ -118,16 +117,12 @@ def test_dockerfile_apt_uses_no_install_recommends_and_cleans_lists():
 # --- Dockerfile: Python dependencies and copied content -----------------------
 
 
-def test_dockerfile_installs_runtime_requirements_without_build_tools():
+def test_dockerfile_installs_requirements_directly():
     run_lines = [ln for ln in _logical_lines(DOCKERFILE) if ln.startswith("RUN ")]
     install_lines = [ln for ln in run_lines if "pip install" in ln]
     assert install_lines, "no RUN installs Python requirements"
-    assert any("requirements-runtime.txt" in ln for ln in install_lines)
+    assert any("-r requirements.txt" in ln for ln in install_lines)
     assert any("--no-cache-dir" in ln for ln in install_lines)
-    assert not any(re.search(r"pip install .* -r requirements\.txt", ln) for ln in install_lines)
-    assert any("grep -viE" in ln and "pyinstaller" in ln for ln in run_lines), (
-        "runtime image must filter the build-only PyInstaller dependency"
-    )
 
 
 def test_dockerfile_copies_only_the_backend_application():
@@ -221,10 +216,16 @@ def test_dockerfile_healthcheck_uses_python_not_curl():
 # --- docker-compose.yml: safe-by-default shape ---------------------------------
 
 
-def test_compose_defines_podcastsync_service_built_from_context():
+def test_compose_defines_podcastsync_service_with_published_image():
     text = _text(COMPOSE)
     assert re.search(r"^services:\s*$", text, re.MULTILINE)
     assert re.search(r"^  podcastsync:\s*$", text, re.MULTILINE)
+    # Default to the published GHCR image, overridable for local builds.
+    assert re.search(
+        r"^    image: \$\{PODCASTSYNC_IMAGE:-ghcr\.io/shay2000/podcastsync:latest\}\s*$",
+        text,
+        re.MULTILINE,
+    ), "compose must default to the published image"
     assert re.search(r"^    build:\s*\.\s*$", text, re.MULTILINE)
 
 
@@ -273,7 +274,7 @@ def test_compose_environment_is_interpolated_and_contains_no_secrets():
     for key, pattern in [
         (
             "PODCASTSYNC_PUBLIC_URL",
-            r"^\s*-\s*PODCASTSYNC_PUBLIC_URL=\$\{PODCASTSYNC_PUBLIC_URL:\?set to https://your.domain\}\s*$",
+            r"^\s*-\s*PODCASTSYNC_PUBLIC_URL=\$\{PODCASTSYNC_PUBLIC_URL:\?set to your URL, e\.g\. http://<tailscale-ip>:8642\}\s*$",
         ),
         (
             "YOUTUBE_API_KEY",
@@ -321,8 +322,9 @@ def test_docker_caddyfile_routes_only_public_feed_and_audio_paths():
 
 def test_env_example_contains_setup_placeholders_not_credentials():
     text = _text(ENV_EXAMPLE)
-    assert "PODCASTSYNC_DOMAIN=podcast.example.com" in text
-    assert "PODCASTSYNC_PUBLIC_URL=https://podcast.example.com" in text
+    assert "PODCASTSYNC_PUBLIC_URL=http://127.0.0.1:8642" in text
+    assert "PODCASTSYNC_BIND_IP=127.0.0.1" in text
+    assert "PODCASTSYNC_IMAGE=ghcr.io/shay2000/podcastsync:latest" in text
     assert re.search(r"^YOUTUBE_API_KEY=\s*$", text, re.MULTILINE)
     assert "AIza" not in text
 

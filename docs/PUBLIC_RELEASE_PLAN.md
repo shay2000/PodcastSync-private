@@ -1,5 +1,11 @@
 # PodcastSync — Public-Release & Fix Plan
 
+> **Historical note (2026-09):** The macOS menu bar app, PyInstaller bundling,
+> and DMG packaging described here have been removed. PodcastSync now ships
+> only as a Docker image for Linux servers; see `Dockerfile`,
+> `deploy/linux/install.sh`, and `.github/workflows/build-release.yml`.
+
+
 **Status:** Draft for owner review
 **Date:** 2026-09-04
 **Scope:** Fix product bugs (feed/client compatibility, backend data-safety, security, UI), add auto-update, and sanitise the repo for a public release.
