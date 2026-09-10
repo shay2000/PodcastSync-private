@@ -210,10 +210,13 @@ def test_install_script_updates_env_on_re_run(tmp_path):
     install_dir = tmp_path / "ps"
 
     # Stub docker: passes the preflight, reports a healthy container.
+    # Handles "docker compose [-f file]... <cmd> [flags] [args]".
     (bin_dir / "docker").write_text(
         "#!/bin/bash\n"
         'if [[ "$1" == "compose" ]]; then\n'
-        '  case "$2" in version|pull|up) exit 0 ;;\n'
+        '  cmd=""\n'
+        '  for a in "${@:2}"; do case "$a" in ps|version|pull|up) cmd="$a" ;; esac; done\n'
+        '  case "$cmd" in version|pull|up) exit 0 ;;\n'
         '    ps) echo \'[{"Name":"podcastsync","Health":"healthy"}]\'; exit 0 ;;\n'
         "  esac\n"
         "fi\n"

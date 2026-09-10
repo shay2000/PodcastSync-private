@@ -184,20 +184,30 @@ if [[ -f .env ]]; then
     fi
 fi
 
+# A cookies.txt next to the compose file means yt-dlp sign-in downloads:
+# include the optional overlay in every compose invocation, matching
+# deploy/oracle/install.sh behaviour.
+compose_files=(-f docker-compose.yml)
+if [[ -f cookies.txt ]]; then
+    chmod 600 cookies.txt 2>/dev/null || true
+    compose_files+=(-f docker-compose.cookies.yml)
+    say "-> cookies.txt found; mounting it for yt-dlp sign-in downloads."
+fi
+
 say "-> Pulling the latest image and starting PodcastSync"
-docker compose pull
-docker compose up -d
+docker compose "${compose_files[@]}" pull
+docker compose "${compose_files[@]}" up -d
 
 say "-> Waiting for the health check"
 for _ in $(seq 1 30); do
-    if docker compose ps --format json 2>/dev/null \
+    if docker compose "${compose_files[@]}" ps --format json 2>/dev/null \
         | grep -q '"Health":"healthy"'; then
         break
     fi
     sleep 2
 done
 
-if docker compose ps --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
+if docker compose "${compose_files[@]}" ps --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
     say "PodcastSync is running and healthy."
 else
     die "the container did not become healthy in time; inspect it with: docker compose logs"
