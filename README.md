@@ -143,9 +143,14 @@ signed in to YouTube. For those, you can provide a "cookies file" — see
 [HANDOFF.md](HANDOFF.md) for the details.
 
 **Listening from podcast apps that live in the cloud** (like Overcast). Those
-apps cannot reach a private server, so they need the extra public mode
-described in [HANDOFF.md](HANDOFF.md). Apps like Apple Podcasts and Downcast
-work without it.
+apps fetch feeds from the internet, so a private server isn't enough for them —
+you need a public web address for just the feed part. Don't worry: you don't
+need to buy a domain name. A free address from [DuckDNS](https://www.duckdns.org)
+works (create a name like `my-podcasts.duckdns.org`, point it at your server,
+and follow the short steps in [HANDOFF.md](HANDOFF.md) — the app handles the
+secure certificate by itself). Only the podcast feed and audio become public;
+your dashboard stays private. Apps like Apple Podcasts and Downcast work
+without any of this.
 
 ## Good to know
 

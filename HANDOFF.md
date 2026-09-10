@@ -90,10 +90,14 @@ curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/d
 Dashboard: `http://<tailscale-ipv4>:8642`, reachable only from the Tailnet.
 See `docs/HERMES_VPS_ONBOARD_PROMPT.md` for the full gate-by-gate runbook.
 
-Public feeds (optional):
+Public feeds (optional — needed only for cloud-based clients like Overcast):
 
 ```bash
-cp .env.example .env   # set PODCASTSYNC_DOMAIN + PODCASTSYNC_PUBLIC_URL
+cp .env.example .env
+# Set PODCASTSYNC_DOMAIN and PODCASTSYNC_PUBLIC_URL in .env.
+# The hostname can be an owned subdomain (podcast.example.com) or a free
+# DuckDNS name (my-podcasts.duckdns.org) pointing at the VPS public IP —
+# Caddy obtains HTTPS certificates for either automatically.
 docker compose --profile public up -d
 ```
 

@@ -213,10 +213,19 @@ Walk the owner through this so they learn the tool:
 
 If the owner wants **Overcast** or any other podcast client whose servers fetch
 feeds from the public internet, the private Tailnet setup is not enough.
-Explain that this requires a real domain, a DNS A record, and opening TCP 80
-and 443 on the VPS, and that you will walk them through `docs/ORACLE_VPS_HANDOFF.md`
-as a second phase if they want it. Do not silently make the feed public; do not
-open port 8642 as a shortcut.
+Explain that this needs a hostname that resolves to the VPS's public IP, a DNS
+record, and TCP 80 and 443 open on the VPS — and that you will walk them
+through `docs/ORACLE_VPS_HANDOFF.md` as a second phase if they want it.
+
+The owner does **not** need to own a domain:
+
+- If they have a domain, use a subdomain like `podcast.example.com`.
+- If not, set up a free **DuckDNS** name (`https://www.duckdns.org`, sign in
+  with any account, create e.g. `my-podcasts.duckdns.org`) and point it at the
+  VPS's public IPv4. Everything else in the runbook is identical: Caddy gets
+  an HTTPS certificate for the name automatically.
+
+Do not silently make the feed public; do not open port 8642 as a shortcut.
 
 ## Optional — YouTube sign-in cookies on the headless VPS
 

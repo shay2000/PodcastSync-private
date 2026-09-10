@@ -18,8 +18,13 @@ The owner should give the coding agent:
 
 1. The VPS SSH address, SSH username, and the path to their SSH key. Give the
    key path, never the private-key contents.
-2. A domain or subdomain they control, for example
-   `podcast.example.com`.
+2. A hostname that will point at the VPS — one of:
+   - a domain or subdomain they control, for example
+     `podcast.example.com`; or
+   - a free **DuckDNS** name (`https://www.duckdns.org`) if they do not own a
+     domain, for example `my-podcasts.duckdns.org`. Everything in this
+     runbook works the same way; Caddy obtains HTTPS certificates for
+     DuckDNS names automatically.
 3. The VPS public IPv4 address.
 4. A YouTube Data API key only if they want full history and `@handle`
    resolution. It is optional; enter it into `.env` through a secure prompt,
@@ -48,7 +53,8 @@ reach the VM and 8642 does not.
 
 ## Owner step 2: create the DNS record
 
-At the registrar or DNS provider, create an **A** record:
+**If the owner owns a domain** — at the registrar or DNS provider, create an
+**A** record:
 
 | Field | Example |
 |---|---|
@@ -60,6 +66,16 @@ At the registrar or DNS provider, create an **A** record:
 This creates `podcast.example.com`. If using the root domain, the host is
 usually `@`. Do not point DNS at a private address such as `100.70.x.x`, and
 do not use a CNAME unless the provider specifically supplies a stable hostname.
+
+**If the owner does not own a domain** — use [DuckDNS](https://www.duckdns.org)
+(free, no credit card):
+
+1. Sign in at `https://www.duckdns.org` with any account (Google, GitHub, etc.).
+2. Create a subdomain, for example `my-podcasts` → `my-podcasts.duckdns.org`.
+3. Enter the VPS public IPv4 address as the IP and save.
+
+That single field is the whole DNS setup; nothing else to configure. Use
+`my-podcasts.duckdns.org` everywhere this runbook says `podcast.example.com`.
 
 If Cloudflare is being used, start with **DNS only** while Caddy obtains its
 certificate. The coding agent can switch to a proxy later after HTTPS has been
