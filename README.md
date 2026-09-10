@@ -1,15 +1,19 @@
 # PodcastSync
 
-![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-111827?style=flat-square)
-![App Type](https://img.shields.io/badge/app-menu%20bar-0f766e?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Docker%20%2F%20Linux-2496ED?style=flat-square&logo=docker)
 ![License](https://img.shields.io/badge/license-MIT-166534?style=flat-square)
 ![Status](https://img.shields.io/badge/status-active-9a3412?style=flat-square)
-![Release](https://img.shields.io/github/v/release/shay2000/PodcastSync)
-![Downloads](https://img.shields.io/github/downloads/shay2000/PodcastSync/total)
+![Release](https://img.shields.io/github/v/release/shay2000/PodcastSync-private)
 
 Turn YouTube channels and playlists into self-hosted podcast feeds.
 
-PodcastSync is a macOS menu bar app that monitors YouTube sources, downloads audio as MP3, and serves podcast RSS feeds on your local network. Subscribe to the feeds in Apple Podcasts, Downcast, or another podcast client on your LAN.
+PodcastSync is a self-hosted server you run in Docker on a Linux VPS (or any
+Docker host). It monitors YouTube sources, downloads audio as MP3, and serves
+podcast RSS feeds. Designed for private access over [Tailscale](https://tailscale.com):
+the dashboard is reachable only from your Tailnet, and podcast clients on your
+devices subscribe to the feed URL. An optional public HTTPS mode (Caddy)
+exposes only the feed and audio paths if you want Overcast or other
+cloud-based podcast clients to reach it.
 
 ## Features
 
@@ -17,107 +21,80 @@ PodcastSync is a macOS menu bar app that monitors YouTube sources, downloads aud
 - **Automatic polling** — checks for new videos on a configurable schedule (default: every 30 minutes)
 - **Audio-only downloads** — extracts audio as MP3 at 192kbps with embedded cover art
 - **Podcast RSS feeds** — one feed per source, valid for any podcast client
-- **LAN accessible** — feed URLs work from any device on your network
 - **Web UI** — manage sources, trigger syncs, copy feed URLs from your browser
-- **Menu bar app** — runs quietly in the background, no Dock icon
+- **Private by default** — dashboard and API bind to loopback or a private Tailscale address; nothing is exposed to the public internet unless you opt in
+- **One-command install** — a small install script sets up Docker Compose on any Linux host
 
 ## Requirements
 
-- macOS 13 (Ventura) or later
+- A Linux host with Docker and the Compose plugin (an Ubuntu VPS with Tailscale is the reference setup)
 - (Optional) [YouTube Data API v3 key](https://console.cloud.google.com/apis/credentials) — enables full video history and handle resolution; without it, the app uses YouTube's public RSS feeds (~15 most recent videos)
 
-## Installation
+## Quick install (Linux VPS)
 
-### From DMG
-
-1. Download the latest `PodcastSync.dmg` from the [GitHub Releases page](https://github.com/shay2000/PodcastSync/releases) or build it locally
-2. Open the DMG and drag `PodcastSync.app` to Applications
-3. Right-click the app → **Open** (required once, to bypass Gatekeeper for this ad-hoc signed app)
-4. The app appears in your menu bar
-
-The packaged DMG bundles the Python backend, `yt-dlp`, `ffmpeg`, and `ffprobe`, so end users do not need to install Homebrew, Python, or extra media tools first.
-
-### Development mode
+With Docker already installed, fetch the compose files and start the server:
 
 ```bash
-git clone https://github.com/shay2000/PodcastSync.git
-cd PodcastSync
-
-# Set up Python environment
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Development mode still expects ffmpeg on the local machine
-brew install ffmpeg
-
-# Run the backend directly
-./scripts/dev.sh
-# Open http://127.0.0.1:8642 in your browser
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh | bash
 ```
 
-### Run on a server (Docker)
+The script installs into `~/podcastsync`, creates a private `.env` (mode 600),
+pulls the image from GHCR, and starts the container. The dashboard listens on
+`127.0.0.1:8642`.
 
-The Docker image runs the same backend as the macOS app, with SQLite and audio
-stored in a persistent `podcastsync-data` volume. The backend is published on
-`127.0.0.1:8642` by default. If another local service owns that port, set
-`PODCASTSYNC_BIND_IP` to the server's private Tailscale address; never use
-`0.0.0.0`. The optional `public` profile adds Caddy in Docker and exposes only
-`/feed/...` and `/audio/...` over HTTPS; the dashboard and `/api` remain
-private.
-
-For the complete owner + coding-agent runbook, see
-[`docs/ORACLE_VPS_HANDOFF.md`](docs/ORACLE_VPS_HANDOFF.md).
-
-Quick start on an Ubuntu Oracle VPS:
-
-1. Create a DNS A record such as `podcast.example.com` pointing to the VPS
-   public IPv4 address. Allow TCP 80 and 443 in the Oracle VCN and instance
-   firewall; leave 8642 closed.
-2. Copy `.env.example` to `.env` (never commit it), set the real domain in
-   `PODCASTSYNC_DOMAIN` and `PODCASTSYNC_PUBLIC_URL`, and optionally add a
-   `YOUTUBE_API_KEY`.
-3. Start the private backend and public HTTPS feed proxy:
-
-   ```bash
-   docker compose --profile public up -d --build
-   curl -fsS http://127.0.0.1:8642/api/status
-   docker compose logs -f podcastsync caddy
-   ```
-
-   Or run `./deploy/oracle/install.sh --domain podcast.example.com`; it creates
-   `.env` only when absent and does not change DNS, firewall rules, or an
-   existing `.env`.
-4. Open the private dashboard through an SSH tunnel:
-
-   ```bash
-   ssh -N -L 8642:127.0.0.1:8642 <ssh-user>@<server-address>
-   ```
-
-   Then visit `http://127.0.0.1:8642` on the owner's Mac. With
-   `PODCASTSYNC_PUBLIC_URL` set, copied feeds and generated RSS enclosures use
-   the HTTPS public origin, for example
-   `https://podcast.example.com/feed/1.xml`.
-
-On a headless server, the Google/YouTube API key enables metadata and full
-history but does not sign yt-dlp into YouTube. If a video requires sign-in, use
-a Netscape-format cookie file. Place it at `cookies.txt` beside the Compose
-file, keep it mode 600, and start with the optional cookie override:
+To reach the dashboard from other devices on your Tailnet, pass your server's
+Tailscale IPv4:
 
 ```bash
-chmod 600 cookies.txt
-docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d --build
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/main/deploy/linux/install.sh \
+  | bash -s -- --bind-ip 100.x.y.z
 ```
 
-The Oracle install script detects this file, mounts it read-only at
-`/data/cookies.txt`, and configures that path automatically. Never bake cookies
-into the image or commit them.
+Then open `http://100.x.y.z:8642` from any device on the Tailnet. The install
+script is idempotent — re-run it (with the same options) to update to a newer
+release.
+
+To install a specific release instead of `main`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shay2000/PodcastSync-private/v0.3.0/deploy/linux/install.sh \
+  | bash -s -- --tag v0.3.0 --bind-ip 100.x.y.z
+```
+
+### Manual setup
+
+```bash
+git clone https://github.com/shay2000/PodcastSync-private.git
+cd PodcastSync-private
+cp .env.example .env
+# Edit .env: set PODCASTSYNC_PUBLIC_URL to the URL clients will use,
+# e.g. http://100.x.y.z:8642 (Tailscale) or https://podcast.example.com (public).
+docker compose up -d
+curl -fsS http://127.0.0.1:8642/api/status
+```
+
+Data (SQLite database + downloaded MP3s) persists in the `podcastsync-data`
+Docker volume.
+
+### Public HTTPS feeds (optional)
+
+Cloud-based podcast clients (e.g. Overcast) cannot reach a Tailscale-only
+feed. If you need that, run the optional Caddy profile with a public domain:
+
+1. Point a DNS A record (e.g. `podcast.example.com`) at the server and open
+   TCP 80/443 in the cloud firewall; leave 8642 closed.
+2. In `.env`, set `PODCASTSYNC_DOMAIN=podcast.example.com` and
+   `PODCASTSYNC_PUBLIC_URL=https://podcast.example.com`.
+3. `docker compose --profile public up -d`
+
+Caddy publishes only `/feed/*` and `/audio/*` over HTTPS. The dashboard and
+`/api` stay private. Full runbook: [`docs/ORACLE_VPS_HANDOFF.md`](docs/ORACLE_VPS_HANDOFF.md).
 
 ## Usage
 
 ### Adding a source
 
-1. Click the menu bar icon → **Open Web UI**
+1. Open the dashboard (`http://<host>:8642`)
 2. Paste a YouTube URL into the "Add Source" form:
    - Channel: `https://www.youtube.com/@mkbhd` or `https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ`
    - Playlist: `https://www.youtube.com/playlist?list=PLxxxxxxx`
@@ -130,14 +107,11 @@ into the image or commit them.
 2. In your podcast app:
    - **Apple Podcasts**: File → Subscribe to Show by URL → paste the URL
    - **Downcast**: Add → Feed URL → paste
-3. The feed URL looks like `http://192.168.x.x:8642/feed/1.xml`
+3. The feed URL looks like `http://100.x.y.z:8642/feed/1.xml` (Tailscale) or
+   `https://podcast.example.com/feed/1.xml` (public profile)
 
-Overcast note:
-Overcast's crawlers cannot reach a feed hosted only on your LAN. Use the Docker
-server deployment above with a public HTTPS URL, then add the HTTPS feed URL in
-Overcast. Apple Podcasts and Downcast can use either a LAN URL or the public
-URL. On iOS 14+, grant the podcast app Local Network permission when subscribing
-to a LAN feed.
+On iOS, grant the podcast app Local Network / VPN permission when subscribing
+to a private feed.
 
 ### Setting up the YouTube API key
 
@@ -151,51 +125,68 @@ The API key is optional but recommended — it enables:
 3. Create an API key (no OAuth required)
 4. In the PodcastSync web UI, go to **Settings** and paste the key
 
-## Building
+### YouTube sign-in cookies (optional)
+
+The API key is not a YouTube sign-in. If a video requires an account, place a
+Netscape-format cookie file at `cookies.txt` beside the Compose file, keep it
+mode 600, and start with the cookie override:
 
 ```bash
-# Install Python dependencies for the backend and the packager
+chmod 600 cookies.txt
+docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d
+```
+
+Then set its path (`/data/cookies.txt` inside the container) under Settings →
+Advanced: cookie file. Never bake cookies into the image or commit them.
+
+## Development
+
+```bash
+git clone https://github.com/shay2000/PodcastSync-private.git
+cd PodcastSync-private
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
+pip install -e ".[dev]"
 
-# Ensure ffmpeg is available on the build machine so it can be bundled
-brew install ffmpeg
+# Run the backend directly (expects ffmpeg on the host)
+./scripts/dev.sh
+# Open http://127.0.0.1:8642
 
-# Build a fresh self-contained .app and .dmg
-./scripts/build_app.sh
-
-# Output: build/PodcastSync.dmg
+# Tests (offline, no network)
+python -m pytest tests/ -q
 ```
 
 ## How it works
 
 1. **Fetcher layer** checks YouTube for new videos (API first, RSS fallback)
 2. **Download manager** uses yt-dlp to extract audio as MP3 at 192kbps with embedded thumbnails
-3. **RSS generator** creates valid podcast XML with `<enclosure>` tags pointing to the local server
+3. **RSS generator** creates valid podcast XML with `<enclosure>` tags pointing at the server
 4. **HTTP server** (FastAPI on port 8642) serves the RSS feeds and audio files
 5. **Scheduler** (APScheduler) runs the fetch→download cycle on a timer
-6. **Menu bar app** (Swift) manages the Python backend process
+
+Releases are Docker images on GHCR (`ghcr.io/shay2000/podcastsync`), built for
+`linux/amd64` and `linux/arm64` by CI on every `v*` tag.
 
 ## File locations
 
 | What | Where |
 |------|-------|
-| Audio files | `~/PodcastMirror/<source-name>/` |
-| Database | `~/.podcastsync/podcastsync.db` |
-| Server | `http://127.0.0.1:8642` locally; use the host's LAN IP for other devices |
+| Audio files (in container) | `/data/PodcastMirror/<source-name>/` |
+| Database (in container) | `/data/podcastsync.db` |
+| Host data | Docker volume `podcastsync-data` |
+| Dashboard | `http://<bind-ip>:8642` (loopback or Tailscale address) |
 
 ## Legal / ToS considerations
 
 - YouTube Data API usage with an API key is within Google's Terms of Service
 - YouTube's public RSS feeds are intended for consumption
 - Audio downloading is performed by yt-dlp as a user-controlled action
-- Downloaded content is served only on your local network and is not redistributed
+- Downloaded content is served only on your private network and is not redistributed
 - **This tool is for personal use only** — respect content creators' rights
 
 ## Known limitations
 
-- The app is ad-hoc signed, not notarized, so Gatekeeper will prompt on first launch
-- Building the DMG still requires `ffmpeg` on the machine doing the build; the finished DMG bundles it for end users
-- Overcast is known to not work reliably with PodcastSync feeds
+- Overcast needs the public HTTPS profile (it cannot reach Tailscale-only feeds)
 - YouTube's RSS feeds return only ~15 most recent videos (use an API key for full history)
 - Podcast clients may cache feeds aggressively (new episodes can take up to an hour to appear)
 - The server must be running for podcast clients to fetch episodes

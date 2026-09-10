@@ -1,8 +1,11 @@
-"""Static release-contract tests that run on the Linux development host.
+"""Static release-contract tests.
 
-The actual Swift, codesign, hdiutil, and PyInstaller execution belongs on the
-macOS release runner. These tests keep the cross-platform shell/workflow
-contracts from silently drifting before that runner is available.
+These keep the cross-platform shell/workflow contracts from silently drifting
+before a release runs: the Linux install script, the version guard, the
+Docker/GHCR release workflow, and the dependency manifests.
+
+The actual Docker build, image push, and container smoke test belong to the
+release workflow itself.
 """
 
 from __future__ import annotations
@@ -18,51 +21,8 @@ def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def test_packaging_inventory_matches_backend_modules():
-    script = read("scripts/build_backend.sh")
-    listed = re.findall(r"--hidden-import\s+(backend(?:\.[A-Za-z_][\w]*)+)", script)
-
-    assert listed, "build_backend.sh must list backend hidden imports"
-    assert len(listed) == len(set(listed))
-    for module in listed:
-        module_path = ROOT / (module.replace(".", "/") + ".py")
-        package_path = ROOT / module.replace(".", "/") / "__init__.py"
-        assert module_path.is_file() or package_path.is_file(), (
-            f"stale hidden import {module}; remove it or add the module"
-        )
-
-    assert "--collect-all feedgen" in script
-    assert 'cp -r "$PROJECT_DIR/backend/static"' in script
-    assert 'cp -r "$PROJECT_DIR/backend/migrations"' in script
-    for trigger in (
-        "apscheduler.triggers.interval",
-        "apscheduler.triggers.date",
-        "apscheduler.triggers.cron",
-    ):
-        assert f"--hidden-import {trigger}" in script, (
-            f"add {trigger} to --hidden-import list in build_backend.sh"
-        )
-
-
-def test_build_app_fails_closed_for_packaging_inputs():
-    script = read("scripts/build_app.sh")
-
-    assert "command -v ffmpeg 2>/dev/null || true" in script
-    assert "command -v ffprobe 2>/dev/null || true" in script
-    assert "|| echo /opt/homebrew/bin/ffmpeg" not in script
-    assert "|| echo /opt/homebrew/bin/ffprobe" not in script
-    assert "PODCASTSYNC_ALLOW_LAUNCHER_FALLBACK" in script
-    assert "PODCASTSYNC_ALLOW_LAUNCHER_FALLBACK:-0" in script
-    assert "codesign --verify --deep --strict" in script
-    assert "hdiutil attach -plist" in script
-    assert "PlistBuddy" in script
-    assert "trap " in script
-    assert "NSHumanReadableCopyright" in script
-    assert "LSApplicationCategoryType" in script
-
-
 def test_version_check_script_accepts_matching_tag_and_rejects_mismatch():
-    script = ROOT / "scripts/check_version.sh"
+    script = ROOT / "scripts" / "check_version.sh"
     assert script.is_file()
 
     pyproject_version = re.search(r'^version = "([^"]+)"', read("pyproject.toml"), re.MULTILINE)
@@ -88,16 +48,109 @@ def test_version_check_script_accepts_matching_tag_and_rejects_mismatch():
     assert "does not match" in mismatch.stderr
 
 
-def test_release_workflow_is_explicit_and_reproducible():
+def test_release_workflow_builds_and_publishes_docker_image():
     workflow = read(".github/workflows/build-release.yml")
 
-    assert "macos-14" in workflow
+    assert "runs-on: ubuntu-latest" in workflow
     assert "default: v0.2.0" not in workflow
     assert "Check version consistency" in workflow
     assert "format('refs/tags/{0}', inputs.release_tag)" in workflow
     assert "retention-days: 30" in workflow
-    assert "Smoke test packaged backend" in workflow
     assert "gh release upload" in workflow
+
+    # The release artifact is a Docker image on GHCR, built for both VPS arches.
+    assert "packages: write" in workflow
+    assert "docker/build-push-action" in workflow
+    assert "linux/amd64,linux/arm64" in workflow
+    # The published image must be exactly what compose/install pull: the name
+    # is pinned, not derived from the repository name.
+    assert "IMAGE_NAME: shay2000/podcastsync" in workflow
+    assert "IMAGE_NAME: ${{ github.repository }}" not in workflow
+    # Manual dispatch still produces the requested version tag.
+    assert "type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}" in workflow
+    # A release must be verified by actually running the container.
+    assert "Smoke test the built image" in workflow
+    assert "api/status" in workflow
+    # No macOS packaging steps may return.
+    for banned in ("macos-14", "build_app.sh", "hdiutil", "codesign", "PyInstaller"):
+        assert banned not in workflow, f"{banned} must not appear in the release workflow"
+
+
+def test_linux_install_script_downloads_release_files_and_start_containers():
+    script = read("deploy/linux/install.sh")
+
+    # Installs from raw.githubusercontent, into a predictable directory.
+    assert "raw.githubusercontent.com" in script
+    assert "docker-compose.yml" in script
+    assert "docker-compose.cookies.yml" in script
+    assert ".env.example" in script
+    assert "Caddyfile.docker" in script
+    # Fails closed on missing Docker / Compose plugin / daemon access.
+    assert "Docker is not installed" in script
+    assert "the Docker Compose plugin is not available" in script
+    assert "Docker is not running" in script
+    # The dashboard is unauthenticated, so the bind address must be private:
+    # loopback/private-range validated, 0.0.0.0 and public addresses rejected.
+    assert "--bind-ip)" in script
+    assert 'bind_ip="127.0.0.1"' in script
+    assert "refusing to bind 0.0.0.0" in script
+    assert "is_private_ip" in script
+    assert "refusing to bind public address" in script
+    # Idempotent: keeps an existing .env, fetches fresh compose files.
+    assert ".env already exists; leaving it unchanged" in script
+    # --tag pins the image so files and backend stay on the same release.
+    assert 'image="ghcr.io/shay2000/podcastsync:${ref#v}"' in script
+    assert 'sed -i "s|^PODCASTSYNC_IMAGE=.*|PODCASTSYNC_IMAGE=${image}|" .env' in script
+    # Verifies the container became healthy before declaring success.
+    assert '"Health":"healthy"' in script
+    assert "docker compose logs" in script
+
+
+def test_install_script_rejects_public_bind_addresses():
+    """The installer must refuse to expose the unauthenticated dashboard."""
+    import subprocess
+
+    run = lambda args: subprocess.run(  # noqa: E731
+        ["bash", str(ROOT / "deploy" / "linux" / "install.sh")] + args,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    public = run(["--bind-ip", "203.0.113.10"])
+    assert public.returncode != 0
+    assert "refusing to bind public address" in public.stderr
+
+    wildcard = run(["--bind-ip", "0.0.0.0"])
+    assert wildcard.returncode != 0
+    assert "refusing to bind 0.0.0.0" in wildcard.stderr
+
+    # Private ranges and Tailscale CGNAT addresses are accepted (the script
+    # then fails later on missing Docker, never on the address itself).
+    for ok in ("127.0.0.1", "100.101.102.103", "192.168.1.10"):
+        result = run(["--bind-ip", ok])
+        assert "refusing to bind" not in result.stderr, f"{ok} should be allowed"
+
+
+def test_packaging_inventory_has_no_macos_leftovers():
+    # The Swift app, PyInstaller bundling, and DMG assembly are gone for good.
+    for banned in (
+        "macos",
+        "debug_app.sh",
+        "scripts/build_app.sh",
+        "scripts/build_backend.sh",
+        "scripts/bundle_macos_tool.sh",
+        "scripts/generate_app_icon.swift",
+    ):
+        assert not (ROOT / banned).exists(), f"{banned} still exists"
+
+    # The runtime code has no frozen-bundle code paths left.
+    for py_file in (ROOT / "backend").rglob("*.py"):
+        text = py_file.read_text(encoding="utf-8")
+        assert "_MEIPASS" not in text, f"{py_file} still references PyInstaller"
+        assert "quarantine" not in text.lower(), f"{py_file} still clears macOS quarantine"
+        assert "osascript" not in text, f"{py_file} still shells out to macOS"
 
 
 def test_dependency_manifests_share_runtime_floors():
@@ -110,6 +163,10 @@ def test_dependency_manifests_share_runtime_floors():
     ):
         assert dependency in pyproject
         assert dependency.split('"')[1] in requirements
+
+    # PyInstaller was a build-only dep for the removed macOS bundle.
+    assert "pyinstaller" not in requirements.lower()
+    assert "pyinstaller" not in pyproject.lower()
 
 
 def test_ci_and_dependabot_contracts_exist():

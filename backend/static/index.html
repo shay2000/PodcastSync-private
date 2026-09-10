@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PodcastSync</title>
     <link rel="icon" type="image/svg+xml" href="/app-icon.svg?v=1">
-    <link rel="stylesheet" href="/css/main.css?v=10">
+    <link rel="stylesheet" href="/css/main.css?v=11">
 </head>
 <body>
     <header class="app-header">
@@ -232,7 +232,6 @@
                                 <label class="config-label" for="detail-path">Download folder</label>
                                 <div class="config-control">
                                     <input type="text" id="detail-path" class="config-input" placeholder="Default ~/PodcastMirror/Name/">
-                                    <button type="button" data-action="browse-directory" data-input-id="detail-path" class="btn-ghost-sm">Browse...</button>
                                     <button type="button" data-action="save-detail-path" class="btn-ghost-sm">Save</button>
                                 </div>
                             </div>
@@ -304,7 +303,6 @@
                     <label for="source-path">Download folder <span class="optional">optional</span></label>
                     <div class="input-group">
                         <input type="text" id="source-path" placeholder="~/PodcastMirror/Name/">
-                        <button type="button" id="browse-source-path" data-action="browse-directory" data-input-id="source-path" class="btn-ghost-sm">Browse...</button>
                     </div>
                 </div>
 
@@ -356,7 +354,7 @@
                     <span class="auth-section-title">YouTube Authentication</span>
                     <span class="auth-global-chip" id="auth-global-status" hidden></span>
                 </div>
-                <p class="form-hint">The API key above and YouTube sign-in are different. Cookies are only needed when YouTube asks a download to sign in. Browser detection works on a Mac; Docker/Linux servers should use the Advanced cookie file option.</p>
+                <p class="form-hint">The API key above and YouTube sign-in are different. Cookies are only needed when YouTube asks a download to sign in. Browser detection needs browsers on the server host; on a Docker/VPS deployment use the Advanced cookie file option below.</p>
 
                 <div id="browser-detect-list" class="browser-list">
                     <div class="browser-list-placeholder">Detecting browsers…</div>
@@ -373,7 +371,6 @@
                     <div class="auth-advanced-body">
                         <div class="input-group">
                             <input type="text" id="cookies-file-path" class="config-input" placeholder="/path/to/cookies.txt">
-                            <button type="button" data-action="browse-directory" data-input-id="cookies-file-path" class="btn-ghost-sm">Browse…</button>
                             <button id="save-cookies-file" data-action="save-cookies-file" class="btn-ghost-sm" type="button">Save</button>
                         </div>
                         <p class="form-hint">Netscape-format cookies file path (overrides browser selection above).</p>
@@ -385,6 +382,6 @@
         </div>
     </div>
 
-    <script type="module" src="/js/main.js?v=11"></script>
+    <script type="module" src="/js/main.js?v=12"></script>
 </body>
 </html>

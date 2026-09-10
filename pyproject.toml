@@ -1,7 +1,7 @@
 [project]
 name = "podcastsync"
-version = "0.2.0"
-description = "Turn YouTube channels and playlists into self-hosted podcast feeds"
+version = "0.3.0"
+description = "Turn YouTube channels and playlists into self-hosted podcast feeds (Docker/Linux server)"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.0",
@@ -17,8 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Test-only. Deliberately kept out of `dependencies` so the PyInstaller bundle
-# is unchanged — see scripts/build_backend.sh.
+# Test/lint-only; the shipped artifact is the Docker image.
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",

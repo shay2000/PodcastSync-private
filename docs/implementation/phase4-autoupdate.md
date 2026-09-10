@@ -1,5 +1,11 @@
 # Phase 4 — Auto-update feature (AU1–AU8)
 
+> **Historical note (2026-09):** The macOS menu bar app, PyInstaller bundling,
+> and DMG packaging described here have been removed. PodcastSync now ships
+> only as a Docker image for Linux servers; see `Dockerfile`,
+> `deploy/linux/install.sh`, and `.github/workflows/build-release.yml`.
+
+
 Goal (owner request): *push a tagged release to the repo → installed PodcastSync menu bar apps detect it, offer it, download + verify it, and install + relaunch with one click.*
 
 User data never travels with updates: DB (`~/.podcastsync`) and audio storage (`~/PodcastMirror`/custom dirs) live outside the `.app` bundle and are untouched.

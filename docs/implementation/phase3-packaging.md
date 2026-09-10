@@ -1,5 +1,11 @@
 # Phase 3 — macOS packaging & release engineering (R1–R7)
 
+> **Historical note (2026-09):** The macOS menu bar app, PyInstaller bundling,
+> and DMG packaging described here have been removed. PodcastSync now ships
+> only as a Docker image for Linux servers; see `Dockerfile`,
+> `deploy/linux/install.sh`, and `.github/workflows/build-release.yml`.
+
+
 Files: `scripts/build_app.sh`, `scripts/build_backend.sh`, `.github/workflows/build-release.yml`, `pyproject.toml`, `requirements.txt`, `macos/PodcastSync/…`, `docs/CHANGELOG` setup (R2), `.github/dependabot.yml` (R5), `README.md` (R5).
 
 Most tasks are macOS/CI-only (`[macOS]`). On the Linux handoff VPS, implement the Linux-testable pieces (R2 version-guard script + workflow text, R3 tests, R5 files) and prepare the `[macOS]` changes for review, clearly marked.

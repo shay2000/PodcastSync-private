@@ -9,7 +9,7 @@ from pathlib import Path
 
 from backend.database import DatabaseManager
 from backend.downloader.artwork import _embed_channel_icon
-from backend.downloader.ffmpeg import _clear_quarantine, find_ffmpeg
+from backend.downloader.ffmpeg import find_ffmpeg
 from backend.services.paths import output_dir_for_source
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,6 @@ class DownloadManager:
         self.max_concurrent = max_concurrent
         self.ffmpeg_path = ffmpeg_path or find_ffmpeg()
         self._settings = settings
-
-        if self.ffmpeg_path:
-            _clear_quarantine(self.ffmpeg_path)
-            ffprobe = os.path.join(os.path.dirname(self.ffmpeg_path), "ffprobe")
-            if os.path.isfile(ffprobe):
-                _clear_quarantine(ffprobe)
 
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._active_downloads: int = 0

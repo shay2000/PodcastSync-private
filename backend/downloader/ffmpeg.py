@@ -1,54 +1,19 @@
-"""ffmpeg discovery for development and frozen macOS builds."""
+"""ffmpeg discovery for Docker and dev environments."""
 
 from __future__ import annotations
 
 import os
 import shutil
-import subprocess
-import sys
-from pathlib import Path
 
-_FFMPEG_SEARCH_PATHS = ["/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg"]
-
-
-def _bundled_ffmpeg_candidates() -> list[Path]:
-    """Return likely bundled ffmpeg locations for frozen builds."""
-    candidates: list[Path] = []
-    if getattr(sys, "frozen", False):
-        executable_dir = Path(sys.executable).resolve().parent
-        candidates.extend(
-            [
-                executable_dir / "tools" / "bin" / "ffmpeg",
-                executable_dir.parent / "tools" / "bin" / "ffmpeg",
-                executable_dir / "_internal" / "tools" / "bin" / "ffmpeg",
-            ]
-        )
-    return candidates
-
-
-def _clear_quarantine(path: str) -> None:
-    """Remove the macOS quarantine xattr so Gatekeeper permits execution."""
-    if sys.platform != "darwin":
-        return
-    try:
-        subprocess.run(
-            ["/usr/bin/xattr", "-d", "com.apple.quarantine", path],
-            check=False,
-            capture_output=True,
-            timeout=5,
-        )
-    except Exception:
-        pass
+_FFMPEG_SEARCH_PATHS = ["/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"]
 
 
 def find_ffmpeg() -> str | None:
-    """Locate the ffmpeg binary on the system or inside a frozen bundle."""
-    bundled = os.getenv("PODCASTSYNC_FFMPEG", "").strip()
-    if bundled and os.path.isfile(bundled) and os.access(bundled, os.X_OK):
-        return bundled
-    for candidate in _bundled_ffmpeg_candidates():
-        if candidate.is_file() and os.access(candidate, os.X_OK):
-            return str(candidate)
+    """Locate the ffmpeg binary (required by yt-dlp for MP3 extraction)."""
+    # Explicit override wins (e.g. a custom bind mount in Docker).
+    override = os.getenv("PODCASTSYNC_FFMPEG", "").strip()
+    if override and os.path.isfile(override) and os.access(override, os.X_OK):
+        return override
     path = shutil.which("ffmpeg")
     if path:
         return path

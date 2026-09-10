@@ -125,17 +125,6 @@ export async function saveDetailEnabled() {
     }
 }
 
-export async function browseDirectory(inputId) {
-    try {
-        const result = await api("POST", "/api/pick-directory");
-        if (result.path) {
-            document.getElementById(inputId).value = result.path;
-        }
-    } catch (error) {
-        toast("Could not open folder picker", "error");
-    }
-}
-
 export function closeDetail() {
     updateState({
         selectedSourceId: null,

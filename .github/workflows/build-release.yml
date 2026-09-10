@@ -1,4 +1,4 @@
-name: Build and publish macOS release
+name: Build and publish Docker release
 
 on:
   push:
@@ -17,12 +17,16 @@ on:
 
 permissions:
   contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  # Must match the image referenced by docker-compose.yml and deploy/linux/install.sh.
+  IMAGE_NAME: shay2000/podcastsync
 
 jobs:
   build-and-publish:
-    # macos-14 is the hosted arm64 runner, matching the native macOS app and
-    # the arm64 PyInstaller bundle produced by the checked-in build scripts.
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     env:
       RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
@@ -33,6 +37,9 @@ jobs:
         with:
           ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag)) || github.ref }}
           fetch-depth: 0
+
+      - name: Check version consistency
+        run: ./scripts/check_version.sh "$RELEASE_TAG"
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -45,79 +52,91 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m venv venv
-          venv/bin/python -m pip install --upgrade pip
-          venv/bin/python -m pip install -r requirements.txt
-          venv/bin/python -m pip install -e ".[dev]"
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e ".[dev]"
 
-      - name: Check version consistency
-        run: ./scripts/check_version.sh "$RELEASE_TAG"
-
-      - name: Install media tools
-        run: |
-          if ! brew list --versions ffmpeg >/dev/null 2>&1; then
-            brew install ffmpeg
-          fi
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+      - name: Lint
+        run: ruff check backend tests && ruff format --check backend tests
 
       - name: Run characterization tests
-        run: venv/bin/python -m pytest tests/ -q
+        run: python -m pytest tests/ -q
 
-      - name: Verify macOS packaging tools
-        run: |
-          for tool in swift hdiutil SetFile Rez DeRez tiffutil tiff2icns; do
-            command -v "$tool"
-          done
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Set bundle version
-        run: echo "PODCASTSYNC_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build app and DMG
-        run: ./scripts/build_app.sh
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # On a tag push, derive semver tags (X.Y.Z, X.Y) plus latest. On a
+          # manual dispatch, github.ref is a branch, so semver matching yields
+          # nothing — fall back to the explicit release_tag input.
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
-      - name: Smoke test packaged backend
-        env:
-          PODCASTSYNC_DB: /tmp/podcastsync-smoke/podcastsync.db
-          PODCASTSYNC_STORAGE: /tmp/podcastsync-smoke/storage
-          PODCASTSYNC_PORT: "8643"
-          YOUTUBE_API_KEY: ""
+      - name: Build and push image (amd64 + arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the built image
         run: |
           set -euo pipefail
-          mkdir -p "$PODCASTSYNC_STORAGE"
-          build/backend-dist/podcastsync-backend/podcastsync-backend &
-          PID=$!
-          cleanup() {
-            kill "$PID" 2>/dev/null || true
-            wait "$PID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:${RELEASE_TAG#v}"
+          docker pull "$IMAGE"
+          docker run -d --name podcastsync-smoke \
+            -e PODCASTSYNC_DB=/data/podcastsync.db \
+            -e PODCASTSYNC_STORAGE=/data/PodcastMirror \
+            -e PODCASTSYNC_PORT=8642 \
+            -e YOUTUBE_API_KEY= \
+            -p 127.0.0.1:8643:8642 \
+            "$IMAGE"
+          trap 'docker rm -f podcastsync-smoke >/dev/null 2>&1 || true' EXIT
           ready=0
-          for i in $(seq 1 60); do
-            if curl -fsS "http://127.0.0.1:${PODCASTSYNC_PORT}/api/status" >/dev/null; then
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:8643/api/status" >/dev/null; then
               ready=1
               break
             fi
             sleep 1
           done
           test "$ready" -eq 1
-          curl -fsS "http://127.0.0.1:${PODCASTSYNC_PORT}/api/status"
-          curl -fsS "http://127.0.0.1:${PODCASTSYNC_PORT}/" | grep -q "PodcastSync"
-          curl -fsS "http://127.0.0.1:${PODCASTSYNC_PORT}/app-icon.svg" -o /dev/null
+          curl -fsS "http://127.0.0.1:8643/api/status"
+          curl -fsS "http://127.0.0.1:8643/" | grep -q "PodcastSync"
 
-      - name: Verify DMG
+      - name: Stage release assets
         run: |
-          test -s build/PodcastSync.dmg
-          hdiutil imageinfo build/PodcastSync.dmg >/dev/null
-          shasum -a 256 build/PodcastSync.dmg | tee build/PodcastSync.dmg.sha256
+          mkdir -p release/deploy/caddy
+          cp docker-compose.yml docker-compose.cookies.yml .env.example release/
+          cp deploy/caddy/Caddyfile.docker release/deploy/caddy/
+          cp deploy/linux/install.sh release/
+          chmod +x release/install.sh
+          tar -czf "podcastsync-docker-${RELEASE_TAG#v}.tar.gz" -C release .
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
           name: PodcastSync-${{ env.RELEASE_TAG }}
           path: |
-            build/PodcastSync.dmg
-            build/PodcastSync.dmg.sha256
+            release/install.sh
+            podcastsync-docker-*.tar.gz
           if-no-files-found: error
           retention-days: 30
 
@@ -132,7 +151,11 @@ jobs:
               --generate-notes
           fi
 
-      - name: Replace release DMG
+      - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE_TAG" build/PodcastSync.dmg build/PodcastSync.dmg.sha256 --clobber
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            release/install.sh \
+            "podcastsync-docker-${RELEASE_TAG#v}.tar.gz" \
+            --clobber

@@ -103,7 +103,7 @@ anything. The agent may automate the following steps:
 5. Start the stack:
 
    ```bash
-   docker compose --profile public up -d --build
+   docker compose --profile public up -d
    docker compose ps
    docker compose logs --tail=100 podcastsync caddy
    ```
@@ -184,7 +184,7 @@ chmod 600 cookies.txt
 Run the installer again, or use the explicit optional Compose override:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.cookies.yml up -d
 ```
 
 The override mounts the file read-only at `/data/cookies.txt`; the installer
@@ -204,7 +204,7 @@ docker compose ps
 
 # Update after reviewing the new commit/tag
 git pull --ff-only
-docker compose --profile public up -d --build
+docker compose --profile public up -d
 ```
 
 Before updates, back up the named `podcastsync-data` volume (database and audio).

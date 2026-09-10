@@ -1,5 +1,11 @@
 # PodcastSync — Implementation Spec (Handoff Edition)
 
+> **Historical note (2026-09):** The macOS menu bar app, PyInstaller bundling,
+> and DMG packaging described here have been removed. PodcastSync now ships
+> only as a Docker image for Linux servers; see `Dockerfile`,
+> `deploy/linux/install.sh`, and `.github/workflows/build-release.yml`.
+
+
 **Handoff target:** an autonomous engineering agent (or human) implementing + testing the public-release hardening of PodcastSync, primarily on a Linux VPS (Docker-capable), with optional macOS for packaging steps.
 **Source repo (as of handoff):** `github.com/shay2000/PodcastSync`, branch `public-release-hardening` (created 2026-09-04). Commit `a9ff853` contains this plan and `AGENTS.md`.
 **Read first:** `AGENTS.md` (repo root) = living codebase guide. This file + its sub-documents = the change spec. `docs/PUBLIC_RELEASE_PLAN.md` = the shorter strategy/overview this spec expands.
