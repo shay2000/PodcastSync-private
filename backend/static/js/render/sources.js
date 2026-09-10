@@ -1,5 +1,5 @@
 import { state } from "../store.js";
-import { esc, formatNumber, formatSyncAge, timeAgo } from "../format.js";
+import { esc, formatCountdown, formatNumber, formatSyncAge, timeAgo } from "../format.js";
 
 export const SOURCE_PALETTES = [
     { accent: "#244983", soft: "rgba(36, 73, 131, 0.15)", glow: "rgba(36, 73, 131, 0.24)" },
@@ -21,6 +21,15 @@ export function sourceKindLabel(sourceType) {
 
 export function sourceStateLabel(enabled) {
     return enabled ? "Active" : "Paused";
+}
+
+export function sourceCompletionPercent(source) {
+    const tracked = Number(source.video_count) || 0;
+    const completed = Number(source.completed_count) || 0;
+    if (!tracked) {
+        return 0;
+    }
+    return Math.min(100, Math.round((completed / tracked) * 100));
 }
 
 export function buildSourceSummary(source) {
@@ -72,9 +81,20 @@ export function renderOverview() {
     const activeOrQueued = (state.currentStatus?.active_downloads || 0)
         + (state.currentStatus?.download_queue_size || 0);
     const subtitle = document.getElementById("library-subtitle");
+    const nextPollElement = document.getElementById("overview-next");
+    const pulseElement = document.getElementById("overview-pulse");
+    const pulseDetailElement = document.getElementById("overview-pulse-detail");
+
+    document.getElementById("overview-shows").textContent = formatNumber(totalShows);
+    document.getElementById("overview-ready").textContent = formatNumber(totalDownloaded);
+    document.getElementById("overview-queue").textContent = formatNumber(activeOrQueued);
+
+    nextPollElement.textContent = formatCountdown(state.currentStatus?.next_poll);
 
     if (!totalShows) {
         subtitle.textContent = "No sources attached yet.";
+        pulseElement.textContent = "Start your library";
+        pulseDetailElement.textContent = "Add a channel or playlist to begin.";
         return;
     }
 
@@ -86,13 +106,22 @@ export function renderOverview() {
     if (activeOrQueued > 0) {
         summaryParts.push(`${formatNumber(activeOrQueued)} active or queued`);
     } else if (state.currentStatus?.next_poll) {
-        const nextPoll = new Date(state.currentStatus.next_poll);
-        const mins = Math.max(0, Math.round((nextPoll.getTime() - Date.now()) / 60000));
-        summaryParts.push(`Next sync in ${mins}m`);
+        summaryParts.push(`Next sync in ${formatCountdown(state.currentStatus.next_poll)}`);
     } else {
         summaryParts.push("Library idle");
     }
     subtitle.textContent = summaryParts.join(" • ");
+
+    if (activeOrQueued > 0) {
+        pulseElement.textContent = "Syncing your library";
+        pulseDetailElement.textContent = `${formatNumber(activeOrQueued)} episode${activeOrQueued === 1 ? "" : "s"} in progress or waiting.`;
+    } else if (totalDownloaded > 0) {
+        pulseElement.textContent = "Ready to listen";
+        pulseDetailElement.textContent = `${formatNumber(totalDownloaded)} episode${totalDownloaded === 1 ? "" : "s"} available in your feeds.`;
+    } else {
+        pulseElement.textContent = "Ready for a sync";
+        pulseDetailElement.textContent = "Your sources are connected; run the first sync when you are ready.";
+    }
 }
 
 export function renderSourceGrid() {
@@ -110,6 +139,7 @@ export function renderSourceGrid() {
         const palette = getPalette(source);
         const stateClass = source.enabled ? "is-active" : "is-paused";
         const selectedClass = source.id === state.selectedSourceId ? "is-selected" : "";
+        const completionPercent = sourceCompletionPercent(source);
 
         return `
             <article
@@ -151,6 +181,16 @@ export function renderSourceGrid() {
                                 <span class="tile-stat-sync-value">${formatSyncAge(source.last_polled_at)}</span>
                             </span>
                             <span class="tile-stat-label">Last sync</span>
+                        </div>
+                    </div>
+
+                    <div class="tile-progress" aria-label="${completionPercent}% of episodes ready">
+                        <div class="tile-progress-meta">
+                            <span>Library progress</span>
+                            <strong>${completionPercent}% ready</strong>
+                        </div>
+                        <div class="tile-progress-track" aria-hidden="true">
+                            <div class="tile-progress-fill" style="width:${completionPercent}%"></div>
                         </div>
                     </div>
                 </div>

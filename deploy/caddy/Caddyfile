@@ -1,13 +1,19 @@
-# Example reverse proxy for the PodcastSync backend (Phase 6 V3).
+# Example host-level reverse proxy for PodcastSync.
 #
 # Placeholder domain: replace "podcast.example.com" with a real domain whose
 # DNS A record points at this host. Configure TLS (Caddy's automatic HTTPS
 # with Let's Encrypt) BEFORE exposing this site publicly: podcast clients
-# require an HTTPS feed URL, and the backend has no authentication of its own,
-# so it must stay reachable only through this proxy on the loopback address.
+# require an HTTPS feed URL. The backend has no user accounts, so expose only
+# the feed and audio paths here; keep the dashboard and /api on loopback.
 # Before enabling this public proxy, set
 # PODCASTSYNC_PUBLIC_URL=https://podcast.example.com in the server environment.
 
 podcast.example.com {
-    reverse_proxy 127.0.0.1:8642
+    @public path /feed/* /audio/*
+    handle @public {
+        reverse_proxy 127.0.0.1:8642
+    }
+    handle {
+        respond "Not found" 404
+    }
 }

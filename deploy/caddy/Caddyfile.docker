@@ -1,0 +1,15 @@
+# Caddyfile used by the optional Docker `public` profile.
+#
+# PODCASTSYNC_DOMAIN is supplied by docker-compose.yml. Only podcast feed and
+# audio paths are public. The dashboard and /api stay reachable through the
+# loopback port and an SSH tunnel, not from the internet.
+
+{$PODCASTSYNC_DOMAIN} {
+    @public path /feed/* /audio/*
+    handle @public {
+        reverse_proxy podcastsync:8642
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

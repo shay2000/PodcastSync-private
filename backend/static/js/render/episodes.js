@@ -47,8 +47,8 @@ export function renderDetailVideos(videos) {
         if (video.error_message) {
             if (video.error_message.startsWith("[AUTH_REQUIRED]")) {
                 errorMarkup = `<div class="error-auth-required">
-                    ⚠ YouTube requires sign-in —
-                    <a href="#" data-action="open-settings">configure cookies in Settings</a>
+                    ⚠ YouTube requires sign-in. An API key is not a sign-in —
+                    <a href="#" data-action="open-settings">test cookies in Settings, then Re-download</a>
                 </div>`;
             } else {
                 errorMarkup = `<div class="progress-info-text">${esc(video.error_message)}</div>`;

@@ -1,7 +1,9 @@
 export function esc(value) {
     const element = document.createElement("span");
     element.textContent = value || "";
-    return element.innerHTML;
+    return element.innerHTML
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 export function formatNumber(value) {
@@ -87,6 +89,29 @@ export function formatSyncAge(isoString) {
 
     const months = Math.floor(diffSeconds / 2592000);
     return `${months} month${months === 1 ? "" : "s"}`;
+}
+
+export function formatCountdown(isoString) {
+    if (!isoString) {
+        return "—";
+    }
+
+    const date = parseAppDate(isoString);
+    if (!date || Number.isNaN(date.getTime())) {
+        return "—";
+    }
+
+    const minutes = Math.max(0, Math.round((date.getTime() - Date.now()) / 60000));
+    if (minutes === 0) {
+        return "Now";
+    }
+    if (minutes < 60) {
+        return `${minutes}m`;
+    }
+    if (minutes < 1440) {
+        return `${Math.round(minutes / 60)}h`;
+    }
+    return `${Math.round(minutes / 1440)}d`;
 }
 
 export function formatDate(isoString) {

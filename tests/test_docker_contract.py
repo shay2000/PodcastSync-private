@@ -14,12 +14,14 @@ phase6-vps.md):
   ``backend.main:app`` under uvicorn on ``0.0.0.0:8642`` with proxy-header
   trust only from ``127.0.0.1``.
 * ``docker-compose.yml`` — safe by default: named persistent ``/data`` volume,
-  ``restart: unless-stopped``, the host port is bound only to ``127.0.0.1``,
-  and PUBLIC_URL / API key / poll interval come from host environment
-  variables (``${...}``) so no secret is embedded in the file.
+  ``restart: unless-stopped``, the host port defaults to ``127.0.0.1`` and can
+  only be overridden with an explicit bind address, and PUBLIC_URL / API key /
+  poll interval come from host environment variables (``${...}``) so no
+  secret is embedded in the file.
 * ``deploy/caddy/Caddyfile`` — reverse-proxies a placeholder domain to
   ``127.0.0.1:8642`` and documents that TLS must be configured before the site
-  is exposed publicly.
+  is exposed publicly; the Docker Caddyfile has the equivalent service-name
+  proxy and only exposes feed/audio paths.
 
 Nothing here starts Docker or makes network calls: the files are read straight
 from the repository root.
@@ -36,7 +38,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 DOCKERFILE = ROOT / "Dockerfile"
 COMPOSE = ROOT / "docker-compose.yml"
+COOKIES_COMPOSE = ROOT / "docker-compose.cookies.yml"
 CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile"
+DOCKER_CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile.docker"
+ENV_EXAMPLE = ROOT / ".env.example"
 
 
 def _text(path: Path) -> str:
@@ -227,11 +232,13 @@ def test_compose_restarts_unless_stopped():
     assert re.search(r"^\s*restart:\s*unless-stopped\s*$", _text(COMPOSE), re.MULTILINE)
 
 
-def test_compose_binds_host_port_only_to_loopback():
+def test_compose_binds_host_port_to_explicit_safe_interface():
     text = _text(COMPOSE)
-    assert re.search(r'^\s*-\s*"127\.0\.0\.1:8642:8642"\s*$', text, re.MULTILINE), (
-        "port must be published as 127.0.0.1:8642:8642"
-    )
+    assert re.search(
+        r'^\s*-\s*"\$\{PODCASTSYNC_BIND_IP:-127\.0\.0\.1\}:8642:8642"\s*$',
+        text,
+        re.MULTILINE,
+    ), "port must default to loopback and require an explicit bind address override"
     for banned in (
         r'^\s*-\s*"8642:8642"\s*$',
         r'^\s*-\s*"0\.0\.0\.0:8642:8642"\s*$',
@@ -253,6 +260,12 @@ def test_compose_uses_named_volume_for_data():
     assert re.search(r"^  podcastsync-data:\s*$", text, re.MULTILINE), (
         "podcastsync-data must be declared as a named volume"
     )
+
+
+def test_cookie_compose_override_mounts_gitignored_file_read_only():
+    text = _text(COOKIES_COMPOSE)
+    assert re.search(r"^\s*-\s*\./cookies\.txt:/data/cookies\.txt:ro\s*$", text, re.MULTILINE)
+    assert "cookies.txt" in _text(ROOT / ".gitignore")
 
 
 def test_compose_environment_is_interpolated_and_contains_no_secrets():
@@ -287,6 +300,33 @@ def test_compose_has_no_curl_based_healthcheck_and_no_cookies():
     assert "cookies" not in text
 
 
+def test_compose_public_profile_publishes_only_caddy_ports():
+    text = _text(COMPOSE)
+    assert re.search(r"^\s*profiles:\s*\[\"public\"\]\s*$", text, re.MULTILINE)
+    assert re.search(r'^\s*-\s*"80:80"\s*$', text, re.MULTILINE)
+    assert re.search(r'^\s*-\s*"443:443"\s*$', text, re.MULTILINE)
+    assert "./deploy/caddy/Caddyfile.docker:/etc/caddy/Caddyfile:ro" in text
+    assert "PODCASTSYNC_DOMAIN=${PODCASTSYNC_DOMAIN:-}" in text
+    assert "caddy-data:/data" in text and "caddy-config:/config" in text
+
+
+def test_docker_caddyfile_routes_only_public_feed_and_audio_paths():
+    text = _text(DOCKER_CADDYFILE)
+    assert "{$PODCASTSYNC_DOMAIN}" in text
+    assert re.search(r"^\s*@public path /feed/\* /audio/\*\s*$", text, re.MULTILINE)
+    assert re.search(r"^\s*reverse_proxy podcastsync:8642\s*$", text, re.MULTILINE)
+    assert 'respond "Not found" 404' in text
+    assert not re.search(r"^\s*reverse_proxy\s+(?!podcastsync:8642\s*$).+$", text, re.MULTILINE)
+
+
+def test_env_example_contains_setup_placeholders_not_credentials():
+    text = _text(ENV_EXAMPLE)
+    assert "PODCASTSYNC_DOMAIN=podcast.example.com" in text
+    assert "PODCASTSYNC_PUBLIC_URL=https://podcast.example.com" in text
+    assert re.search(r"^YOUTUBE_API_KEY=\s*$", text, re.MULTILINE)
+    assert "AIza" not in text
+
+
 # --- deploy/caddy/Caddyfile ----------------------------------------------------
 
 
@@ -312,7 +352,7 @@ def test_port_8642_is_consistent_across_artifacts():
     assert re.search(r"^EXPOSE\s+8642\b", docker, re.MULTILINE)
     tokens = _cmd_tokens()
     assert "--port" in tokens and tokens[tokens.index("--port") + 1] == "8642"
-    assert "127.0.0.1:8642:8642" in _text(COMPOSE)
+    assert "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642" in _text(COMPOSE)
     assert "127.0.0.1:8642" in _text(CADDYFILE)
 
 
@@ -327,7 +367,7 @@ def test_volume_target_matches_container_data_envs():
 def test_loopback_only_publish_complements_loopback_proxy_trust():
     dockerfile = _text(DOCKERFILE)
     compose = _text(COMPOSE)
-    assert "127.0.0.1:8642:8642" in compose
+    assert "${PODCASTSYNC_BIND_IP:-127.0.0.1}:8642:8642" in compose
     assert "--forwarded-allow-ips" in dockerfile
     assert "127.0.0.1" in dockerfile
     assert "0.0.0.0:8642:8642" not in compose

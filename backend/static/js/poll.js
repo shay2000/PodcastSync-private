@@ -1,4 +1,5 @@
 import { api, getSettings } from "./api.js";
+import { formatCountdown } from "./format.js";
 import { renderDetailVideos, showEpisodeLoading } from "./render/episodes.js";
 import { renderOverview } from "./render/sources.js";
 import { toast } from "./ui/toast.js";
@@ -81,9 +82,7 @@ export async function loadStatus() {
 
         const parts = [];
         if (status.next_poll) {
-            const next = new Date(status.next_poll);
-            const mins = Math.max(0, Math.round((next.getTime() - Date.now()) / 60000));
-            parts.push(`Next sync ${mins}m`);
+            parts.push(`Next sync ${formatCountdown(status.next_poll)}`);
         }
         if (status.active_downloads > 0) {
             parts.push(`${status.active_downloads} downloading`);
@@ -103,8 +102,11 @@ export async function loadStatus() {
         if (document.activeElement !== cookiePath) {
             cookiePath.value = settings.cookies_file_path || "";
         }
+        const downloadLogin = settings.cookies_file_path
+            ? (settings.cookies_file_available ? "cookie file ready" : "cookie file missing")
+            : (settings.cookies_from_browser ? `${settings.cookies_from_browser} selected` : "not configured");
         document.getElementById("settings-info").textContent =
-            `Base URL: ${settings.base_url} • API key: ${settings.youtube_api_key_set ? "set" : "not set"} • Storage: ${settings.storage_path}`;
+            `Base URL: ${settings.base_url} • API key: ${settings.youtube_api_key_set ? "set" : "not set"} • Download login: ${downloadLogin} • Storage: ${settings.storage_path}`;
 
         renderOverview();
     } catch (error) {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 
@@ -22,6 +23,9 @@ def settings_to_response(settings) -> dict:
         "public_url": settings.public_url,
         "cookies_from_browser": settings.cookies_from_browser,
         "cookies_file_path": settings.cookies_file_path,
+        "cookies_file_available": bool(
+            settings.cookies_file_path and Path(settings.cookies_file_path).is_file()
+        ),
     }
 
 

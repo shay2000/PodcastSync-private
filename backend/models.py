@@ -76,6 +76,7 @@ class SettingsResponse(BaseModel):
     public_url: str = ""
     cookies_from_browser: str = ""
     cookies_file_path: str = ""
+    cookies_file_available: bool = False
 
 
 class SettingsUpdate(BaseModel):

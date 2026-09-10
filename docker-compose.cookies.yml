@@ -1,0 +1,10 @@
+# Optional YouTube-authentication override.
+#
+# Keep cookies.txt out of git. Use this file only after placing a protected
+# Netscape-format cookies.txt beside docker-compose.yml. The file is mounted
+# read-only inside the container; the private dashboard stores the path in
+# SQLite so the downloader can use it.
+services:
+  podcastsync:
+    volumes:
+      - ./cookies.txt:/data/cookies.txt:ro
