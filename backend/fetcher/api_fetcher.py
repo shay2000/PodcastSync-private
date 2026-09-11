@@ -31,10 +31,19 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
         self.api_key = api_key
         self._service = build("youtube", "v3", developerKey=api_key)
         self._uploads_cache: dict[str, str] = {}  # channel_id -> uploads_playlist_id
+        # httplib2's transport is not thread-safe; serialize requests so
+        # overlapping syncs never execute concurrently through it.
+        self._execute_lock = asyncio.Lock()
 
     async def _execute(self, request):
-        """Run a blocking googleapiclient request without stalling the event loop."""
-        return await asyncio.to_thread(request.execute)
+        """Run a blocking googleapiclient request without stalling the event loop.
+
+        Serialized per fetcher instance because the shared googleapiclient/
+        httplib2 transport is not safe for concurrent use from multiple
+        ``asyncio.to_thread`` worker threads.
+        """
+        async with self._execute_lock:
+            return await asyncio.to_thread(request.execute)
 
     def _handle_http_error(self, e) -> None:
         from googleapiclient.errors import HttpError  # Lazy import
