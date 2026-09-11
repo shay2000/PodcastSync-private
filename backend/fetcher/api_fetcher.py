@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -30,6 +31,19 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
         self.api_key = api_key
         self._service = build("youtube", "v3", developerKey=api_key)
         self._uploads_cache: dict[str, str] = {}  # channel_id -> uploads_playlist_id
+        # httplib2's transport is not thread-safe; serialize requests so
+        # overlapping syncs never execute concurrently through it.
+        self._execute_lock = asyncio.Lock()
+
+    async def _execute(self, request):
+        """Run a blocking googleapiclient request without stalling the event loop.
+
+        Serialized per fetcher instance because the shared googleapiclient/
+        httplib2 transport is not safe for concurrent use from multiple
+        ``asyncio.to_thread`` worker threads.
+        """
+        async with self._execute_lock:
+            return await asyncio.to_thread(request.execute)
 
     def _handle_http_error(self, e) -> None:
         from googleapiclient.errors import HttpError  # Lazy import
@@ -50,24 +64,21 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
         """Resolve a handle, custom URL, or username to a channel ID."""
         try:
             if id_type == "handle":
-                resp = (
-                    self._service.channels()
-                    .list(part="id", forHandle=identifier, maxResults=1)
-                    .execute()
+                request = self._service.channels().list(
+                    part="id", forHandle=identifier, maxResults=1
                 )
+                resp = await self._execute(request)
             elif id_type == "user":
-                resp = (
-                    self._service.channels()
-                    .list(part="id", forUsername=identifier, maxResults=1)
-                    .execute()
+                request = self._service.channels().list(
+                    part="id", forUsername=identifier, maxResults=1
                 )
+                resp = await self._execute(request)
             elif id_type == "custom":
                 # Try searching for the custom URL
-                resp = (
-                    self._service.search()
-                    .list(part="id", q=identifier, type="channel", maxResults=1)
-                    .execute()
+                request = self._service.search().list(
+                    part="id", q=identifier, type="channel", maxResults=1
                 )
+                resp = await self._execute(request)
                 items = resp.get("items", [])
                 if items:
                     return items[0]["id"]["channelId"]
@@ -90,7 +101,8 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
             return self._uploads_cache[channel_id]
 
         try:
-            resp = self._service.channels().list(part="contentDetails", id=channel_id).execute()
+            request = self._service.channels().list(part="contentDetails", id=channel_id)
+            resp = await self._execute(request)
             items = resp.get("items", [])
             if not items:
                 raise ValueError(f"Channel not found: {channel_id}")
@@ -106,7 +118,8 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
     async def get_channel_icon_url(self, channel_id: str) -> str | None:
         """Return the highest-resolution channel avatar URL, or None on failure."""
         try:
-            resp = self._service.channels().list(part="snippet", id=channel_id).execute()
+            request = self._service.channels().list(part="snippet", id=channel_id)
+            resp = await self._execute(request)
             items = resp.get("items", [])
             if not items:
                 return None
@@ -138,16 +151,13 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
         try:
             while True:
                 page_size = min(50, remaining) if remaining else 50
-                resp = (
-                    self._service.playlistItems()
-                    .list(
-                        part="snippet,contentDetails",
-                        playlistId=playlist_id,
-                        maxResults=page_size,
-                        pageToken=page_token,
-                    )
-                    .execute()
+                request = self._service.playlistItems().list(
+                    part="snippet,contentDetails",
+                    playlistId=playlist_id,
+                    maxResults=page_size,
+                    pageToken=page_token,
                 )
+                resp = await self._execute(request)
 
                 video_ids = []
                 snippet_map = {}
@@ -159,14 +169,11 @@ class YouTubeApiFetcher(YouTubeSourceFetcher):
 
                 # Batch fetch durations via videos.list
                 if video_ids:
-                    details_resp = (
-                        self._service.videos()
-                        .list(
-                            part="contentDetails",
-                            id=",".join(video_ids),
-                        )
-                        .execute()
+                    request = self._service.videos().list(
+                        part="contentDetails",
+                        id=",".join(video_ids),
                     )
+                    details_resp = await self._execute(request)
                     duration_map = {}
                     for d_item in details_resp.get("items", []):
                         raw = d_item["contentDetails"].get("duration", "PT0S")

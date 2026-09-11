@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -32,7 +33,8 @@ class YouTubeRssFetcher(YouTubeSourceFetcher):
             url = f"{YOUTUBE_RSS_BASE}?playlist_id={youtube_id}"
 
         logger.info("RSS fetching from %s", url)
-        feed = feedparser.parse(url)
+        # feedparser.parse does blocking network I/O; keep it off the event loop.
+        feed = await asyncio.to_thread(feedparser.parse, url)
 
         if feed.bozo and not feed.entries:
             logger.error("RSS feed parse error for %s: %s", url, feed.bozo_exception)

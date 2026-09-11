@@ -7,19 +7,30 @@ from typing import Any
 from backend.fetcher.url_parser import parse_youtube_url
 
 
-def source_dto(db: Any, source: Any) -> dict:
-    """Serialize a database source row into the public source shape."""
+def source_dto(db: Any, source: Any, counts: dict[int, tuple[int, int]] | None = None) -> dict:
+    """Serialize a database source row into the public source shape.
+
+    ``counts`` lets a caller that already fetched the whole-library aggregate
+    (``DatabaseManager.get_video_counts``) avoid two COUNT queries per source.
+    When omitted, the counts are looked up for this source alone.
+    """
+    if counts is not None:
+        video_count, completed_count = counts.get(source["id"], (0, 0))
+    else:
+        video_count = db.get_video_count(source["id"])
+        completed_count = db.get_completed_count(source["id"])
     return {
         **dict(source),
         "enabled": bool(source["enabled"]),
-        "video_count": db.get_video_count(source["id"]),
-        "completed_count": db.get_completed_count(source["id"]),
+        "video_count": video_count,
+        "completed_count": completed_count,
     }
 
 
 def list_source_dtos(db: Any) -> list[dict]:
     """Return all sources in the same order as the API has always used."""
-    return [source_dto(db, source) for source in db.get_all_sources()]
+    counts = db.get_video_counts()
+    return [source_dto(db, source, counts) for source in db.get_all_sources()]
 
 
 def get_source_dto(db: Any, source_id: int) -> dict | None:

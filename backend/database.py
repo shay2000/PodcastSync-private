@@ -309,6 +309,20 @@ class DatabaseManager:
         )
         return row["cnt"] if row else 0
 
+    def get_video_counts(self) -> dict[int, tuple[int, int]]:
+        """Return ``{source_id: (total, completed)}`` for every source at once.
+
+        Callers that need counts for a whole source listing use this instead of
+        two COUNT queries per source, which turned the listing into an N+1.
+        Sources with no videos are simply absent from the result.
+        """
+        rows = self.fetch_all(
+            "SELECT source_id, COUNT(*) AS total, "
+            "SUM(CASE WHEN download_status = 'completed' THEN 1 ELSE 0 END) AS completed "
+            "FROM videos GROUP BY source_id"
+        )
+        return {row["source_id"]: (row["total"], row["completed"]) for row in rows}
+
     def get_last_poll_time(self) -> str | None:
         """Return the most recent source poll timestamp, if any."""
         row = self.fetch_one("SELECT MAX(last_polled_at) as lp FROM sources")

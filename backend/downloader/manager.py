@@ -222,6 +222,8 @@ class DownloadManager:
         """Download all pending videos for a source."""
         pending = self.db.get_pending_videos(source_id)
         if not pending:
+            if max_keep_episodes:
+                self._apply_rolling_delete(source_id, max_keep_episodes)
             return 0
 
         logger.info("Processing %d pending downloads for source %d", len(pending), source_id)
@@ -243,9 +245,16 @@ class DownloadManager:
                 )
                 if result:
                     completed += 1
-                    if max_keep_episodes:
-                        self._apply_rolling_delete(source_id, max_keep_episodes)
 
-        await asyncio.gather(*[_download_one(row) for row in pending])
+        try:
+            await asyncio.gather(*[_download_one(row) for row in pending])
+        finally:
+            # Prune once per batch rather than after every file: the end state
+            # is identical, and it avoids re-querying the overflow set per
+            # download. Runs even on cancellation/error so retention is still
+            # enforced for whatever finished.
+            if max_keep_episodes:
+                self._apply_rolling_delete(source_id, max_keep_episodes)
+
         logger.info("Completed %d/%d downloads for source %d", completed, len(pending), source_id)
         return completed

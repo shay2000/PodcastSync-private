@@ -59,4 +59,5 @@ async def list_feeds(request: Request) -> list[dict]:
 
     base_url = _feed_base_url(request)
     sources = db.get_all_sources()
-    return [_feed_summary(source_dto(db, s), base_url) for s in sources]
+    counts = db.get_video_counts()
+    return [_feed_summary(source_dto(db, s, counts), base_url) for s in sources]
