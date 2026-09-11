@@ -243,9 +243,13 @@ class DownloadManager:
                 )
                 if result:
                     completed += 1
-                    if max_keep_episodes:
-                        self._apply_rolling_delete(source_id, max_keep_episodes)
 
         await asyncio.gather(*[_download_one(row) for row in pending])
+
+        # Prune once per batch rather than after every file: the end state is
+        # identical, and it avoids re-querying the overflow set per download.
+        if completed and max_keep_episodes:
+            self._apply_rolling_delete(source_id, max_keep_episodes)
+
         logger.info("Completed %d/%d downloads for source %d", completed, len(pending), source_id)
         return completed
