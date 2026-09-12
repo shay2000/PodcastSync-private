@@ -1,5 +1,7 @@
 # PodcastSync
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/shay2k)
+
 Turn YouTube channels into your own personal podcast.
 
 PodcastSync watches YouTube channels you choose, saves the audio of new videos
@@ -163,3 +165,13 @@ python -m pytest tests/ -q      # offline test suite
 
 Releases are Docker images on GHCR (`ghcr.io/shay2000/podcastsync`), built
 for amd64 and arm64 by CI on every `v*` tag.
+
+## Support PodcastSync
+
+If this project is useful to you, you can support its maintenance with a coffee:
+
+<p align="center">
+  <a href="https://buymeacoffee.com/shay2k">
+    <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"/>
+  </a>
+</p>
